@@ -1,0 +1,226 @@
+import React, { useState, useMemo, useCallback } from 'react';
+import { PiggyBank, Clock, TrendingDown, Sparkles, Shield, ArrowUpCircle, Wallet, Zap, Landmark, HelpCircle, Divide, CalendarDays, Building } from 'lucide-react';
+
+// --- Helper Functions ---
+const formatCurrency = (value) => {
+    if (isNaN(value) || value === null) return 'RD$ 0.00';
+    return value.toLocaleString('es-DO', { style: 'currency', currency: 'DOP', minimumFractionDigits: 2 });
+};
+
+const formatRatio = (value) => {
+    if (isNaN(value) || value === null) return 'N/A';
+    return value.toFixed(2);
+}
+
+// --- Reusable Components ---
+const MetricCard = ({ title, value, icon, colorClass = 'text-indigo-600', tooltipText, subValue }) => (
+    <div title={tooltipText} className="bg-white p-5 rounded-xl shadow-lg border border-gray-200 transition-all hover:shadow-xl hover:-translate-y-1">
+        <div className="flex items-start justify-between">
+            <div className="flex items-center">
+                <div className={`mr-4 p-3 rounded-full bg-opacity-10 ${colorClass.replace('text-', 'bg-')}`}>
+                    {icon}
+                </div>
+                <div>
+                    <p className="text-sm text-gray-500 flex items-center">{title} <HelpCircle size={12} className="ml-1 opacity-50"/></p>
+                    <p className={`text-2xl font-bold ${colorClass}`}>{value}</p>
+                </div>
+            </div>
+            {subValue && <span className="text-xs font-semibold text-gray-400 bg-gray-100 px-2 py-1 rounded-full">{subValue}</span>}
+        </div>
+    </div>
+);
+
+const InputField = ({ label, id, value, onChange, type = 'number' }) => (
+    <div>
+        <label htmlFor={id} className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+        <input
+            type={type}
+            id={id}
+            value={value}
+            onChange={onChange}
+            className="w-full p-3 bg-gray-50 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition"
+        />
+    </div>
+);
+
+const ToggleSwitch = ({ label, checked, onChange }) => (
+    <label className="flex items-center cursor-pointer">
+        <div className="relative">
+            <input type="checkbox" className="sr-only" checked={checked} onChange={onChange} />
+            <div className={`block w-14 h-8 rounded-full transition-colors ${checked ? 'bg-indigo-600' : 'bg-gray-200'}`}></div>
+            <div className={`dot absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition-transform shadow-md ${checked ? 'transform translate-x-6' : ''}`}></div>
+        </div>
+        <div className="ml-3 text-gray-700 font-medium">{label}</div>
+    </label>
+);
+
+const SummaryHighlight = ({ title, value, originalValue, isCurrency = true }) => (
+    <div className="py-4 border-b border-gray-200 last:border-b-0">
+        <p className="text-sm text-gray-500">{title}</p>
+        <div className="flex items-baseline mt-1">
+            <p className="text-2xl font-bold text-indigo-600">{isCurrency ? formatCurrency(value) : value}</p>
+            <p className="text-sm text-gray-400 ml-3 line-through">{isCurrency ? formatCurrency(originalValue) : originalValue}</p>
+        </div>
+    </div>
+);
+
+
+// --- Main App Component ---
+export default function App() {
+    const [loanData, setLoanData] = useState({ amount: '500000', interest: '18', term: '5' });
+    const [abonos, setAbonos] = useState([]);
+    const [isFixedAbono, setIsFixedAbono] = useState(false);
+    const [fixedAbonoAmount, setFixedAbonoAmount] = useState('2500');
+
+    const handleInputChange = useCallback((e) => {
+        const { id, value } = e.target;
+        setLoanData(prev => ({ ...prev, [id]: value }));
+    }, []);
+
+    const handleAbonoChange = useCallback((index, value) => {
+        const newAbonos = [...abonos];
+        newAbonos[index] = parseFloat(value) || 0;
+        setAbonos(newAbonos);
+    }, [abonos]);
+
+    const handleFixedAbonoToggle = useCallback(() => setIsFixedAbono(prev => !prev), []);
+    const handleFixedAbonoAmountChange = useCallback((e) => setFixedAbonoAmount(e.target.value), []);
+    
+    const calculationResults = useMemo(() => {
+        const amount = parseFloat(loanData.amount);
+        const interest = parseFloat(loanData.interest);
+        const term = parseFloat(loanData.term);
+        const parsedFixedAbono = parseFloat(fixedAbonoAmount);
+
+        if (isNaN(amount) || amount <= 0 || isNaN(interest) || interest < 0 || isNaN(term) || term <= 0) {
+            return null;
+        }
+
+        const monthlyInterest = interest / 100 / 12;
+        const totalPayments = term * 12;
+        const monthlyPayment = (amount * monthlyInterest) / (1 - Math.pow(1 + monthlyInterest, -totalPayments));
+
+        const original = {
+            monthlyPayment,
+            totalInterest: (monthlyPayment * totalPayments) - amount,
+            totalPaid: (monthlyPayment * totalPayments),
+            termInMonths: totalPayments,
+        };
+
+        const currentAbonos = isFixedAbono ? new Array(totalPayments).fill(isNaN(parsedFixedAbono) ? 0 : parsedFixedAbono) : abonos;
+        let balance = amount;
+        let schedule = [];
+        let totalAbonosPaid = 0;
+        let monthsPaid = 0;
+
+        for (let i = 0; i < totalPayments && balance > 0.01; i++) {
+            monthsPaid++;
+            const interestPayment = balance * monthlyInterest;
+            const extraPayment = currentAbonos[i] || 0;
+            totalAbonosPaid += extraPayment;
+            const regularPayment = monthlyPayment > balance + interestPayment ? balance + interestPayment : monthlyPayment;
+            const principalPayment = regularPayment - interestPayment;
+            
+            balance -= (principalPayment + extraPayment);
+            schedule.push({
+                month: i + 1, payment: regularPayment, principal: principalPayment,
+                interest: interestPayment, extra: extraPayment, balance: balance > 0 ? balance : 0,
+            });
+        }
+        
+        const withAbonos = {
+            schedule,
+            totalInterest: schedule.reduce((acc, p) => acc + p.interest, 0),
+            totalPaid: schedule.reduce((acc, p) => acc + p.interest, 0) + amount,
+            termInMonths: monthsPaid,
+            totalAbonosPaid,
+        };
+        
+        return { original, withAbonos, inputs: { amount } };
+    }, [loanData, abonos, isFixedAbono, fixedAbonoAmount]);
+
+    if (!calculationResults) {
+        return (
+             <div className="bg-gray-100 min-h-screen p-4 sm:p-6 lg:p-8 text-gray-800">
+                <div className="max-w-4xl mx-auto">
+                     <header className="text-center mb-10">
+                        <h1 className="text-4xl sm:text-5xl font-bold text-gray-800">Calculadora de Préstamos Inteligente</h1>
+                        <p className="text-gray-500 mt-2 text-lg">Descubre cómo los abonos a capital transforman tu futuro financiero.</p>
+                    </header>
+                    <div className="bg-white p-6 rounded-2xl shadow-lg border border-gray-200 mb-8">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <InputField label="Monto del Préstamo (RD$)" id="amount" value={loanData.amount} onChange={handleInputChange} />
+                            <InputField label="Tasa de Interés Anual (%)" id="interest" value={loanData.interest} onChange={handleInputChange} />
+                            <InputField label="Plazo (Años)" id="term" value={loanData.term} onChange={handleInputChange} />
+                        </div>
+                    </div>
+                    <div className="text-center bg-yellow-50 border border-yellow-300 text-yellow-800 p-10 rounded-2xl shadow-lg">
+                        <h2 className="text-2xl font-bold">Calculadora Lista</h2>
+                        <p className="mt-2">Por favor, ingrese valores numéricos válidos en todos los campos para comenzar el análisis.</p>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    const { original, withAbonos, inputs } = calculationResults;
+    const { amount } = inputs;
+    const interestSaved = original.totalInterest - withAbonos.totalInterest;
+    const monthsSaved = original.termInMonths - withAbonos.termInMonths;
+
+    return (
+        <div className="bg-gray-100 min-h-screen p-4 sm:p-6 lg:p-8 text-gray-800">
+            <div className="max-w-4xl mx-auto">
+                <header className="text-center mb-10">
+                    <h1 className="text-4xl sm:text-5xl font-bold text-gray-800">Calculadora de Préstamos Inteligente</h1>
+                    <p className="text-gray-500 mt-2 text-lg">Descubre cómo los abonos a capital transforman tu futuro financiero.</p>
+                </header>
+
+                <div className="bg-white p-6 rounded-2xl shadow-lg border border-gray-200 mb-8">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <InputField label="Monto del Préstamo (RD$)" id="amount" value={loanData.amount} onChange={handleInputChange} />
+                        <InputField label="Tasa de Interés Anual (%)" id="interest" value={loanData.interest} onChange={handleInputChange} />
+                        <InputField label="Plazo (Años)" id="term" value={loanData.term} onChange={handleInputChange} />
+                    </div>
+                    <div className="mt-6 pt-6 border-t border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-4">
+                        <ToggleSwitch label="Aplicar abono fijo mensual" checked={isFixedAbono} onChange={handleFixedAbonoToggle} />
+                        {isFixedAbono && (
+                             <div className="w-full sm:w-auto">
+                                <InputField label="Monto del Abono Fijo" id="fixedAbonoAmount" value={fixedAbonoAmount} onChange={handleFixedAbonoAmountChange} />
+                            </div>
+                        )}
+                    </div>
+                </div>
+                
+                <div className="bg-gradient-to-br from-indigo-600 to-purple-700 text-white p-8 rounded-2xl shadow-2xl mb-8">
+                    <h2 className="text-2xl font-bold text-center mb-6">Tu Nuevo Panorama Financiero</h2>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-center divide-x divide-white/20">
+                        <div className="px-2">
+                            <p className="opacity-80">Ahorro en Intereses</p>
+                            <p className="text-4xl font-bold mt-1">{formatCurrency(interestSaved)}</p>
+                        </div>
+                        <div className="px-2">
+                            <p className="opacity-80">Tiempo Ahorrado</p>
+                            <p className="text-4xl font-bold mt-1">{monthsSaved} <span className="text-2xl">meses</span></p>
+                        </div>
+                        <div className="px-2">
+                            <p className="opacity-80">Total Pagado</p>
+                            <p className="text-4xl font-bold mt-1">{formatCurrency(withAbonos.totalPaid)}</p>
+                            <p className="text-sm opacity-70 line-through">{formatCurrency(original.totalPaid)}</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="bg-white p-6 rounded-2xl shadow-lg border border-gray-200">
+                    <h2 className="text-2xl font-bold text-gray-700 mb-4">Resumen General y Comparativa</h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2">
+                        <SummaryHighlight title="Total Intereses a Pagar" value={withAbonos.totalInterest} originalValue={original.totalInterest} />
+                        <SummaryHighlight title="Plazo Final del Préstamo" value={`${withAbonos.termInMonths} meses`} originalValue={`${original.termInMonths} meses`} isCurrency={false} />
+                        <SummaryHighlight title="Costo por cada RD$1 Prestado" value={formatRatio(withAbonos.totalPaid / amount)} originalValue={formatRatio(original.totalPaid / amount)} isCurrency={false} />
+                        <SummaryHighlight title="Capital Pagado (Primer Año)" value={withAbonos.firstYearPrincipal} originalValue={original.firstYearPrincipal} />
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
