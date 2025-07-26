@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard de Rentabilidad - Diseño Guiado</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root {
+            --bg-color: #000000;
+            --card-color: #181818;
+            --border-color: rgba(255, 255, 255, 0.08);
+            --text-primary: #f0f0f0;
+            --text-secondary: #a0a0a0;
+            --accent-blue: #3b82f6;
+            --accent-green: #22c55e;
+            --accent-red: #ef4444;
+            --accent-amber: #f59e0b;
+            --accent-purple: #a371f7;
+        }
+        body { font-family: 'Inter', sans-serif; background-color: var(--bg-color); color: var(--text-primary); }
+        .card { background-color: var(--card-color); border-radius: 0.5rem; border: 1px solid var(--border-color); padding: 1.5rem; transition: all 0.3s ease; }
+        .input-group label { display: block; color: var(--text-secondary); font-weight: 500; font-size: 0.875rem; margin-bottom: 0.5rem; }
+        .input-group input { background-color: #0a0a0a; border: 1px solid #2a2a2a; color: var(--text-primary); padding: 0.75rem; border-radius: 0.375rem; width: 100%; }
+        .input-group input:focus { outline: none; border-color: var(--accent-blue); box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3); }
+        .metric-value { font-weight: 800; }
+        .metric-label { color: var(--text-secondary); }
+        .positive { color: var(--accent-green); }
+        .negative { color: var(--accent-red); }
+        .analysis-item { display: flex; justify-content: space-between; align-items: center; padding: 0.6rem 0; border-bottom: 1px solid var(--border-color); }
+        .analysis-item:last-child { border-bottom: none; }
+        .tab-button { padding: 0.5rem 1rem; border-radius: 0.375rem; font-weight: 600; cursor: pointer; transition: background-color 0.2s, color 0.2s; border: 1px solid transparent; }
+        .tab-button.active { background-color: var(--accent-blue); color: #fff; }
+        .tab-button:not(.active) { background-color: #21262d; color: var(--text-secondary); }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .hidden-initial { display: none; }
+        .step {
+            transition: opacity 0.5s ease-in-out, transform 0.5s ease-in-out;
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .step.hidden {
+            opacity: 0;
+            transform: translateY(20px);
+            display: none;
+        }
+        .progress-bar-bg { background-color: #2a2a2a; }
+        .progress-bar { background-color: var(--accent-blue); transition: width 0.5s ease-out; }
+    </style>
+</head>
+<body class="p-4 md:p-6 lg:p-8">
+
+    <div class="max-w-screen-xl mx-auto space-y-8">
+        <header class="text-center">
+            <h1 class="text-3xl md:text-4xl font-black tracking-tighter">Dashboard Estratégico de Rentabilidad</h1>
+            <p class="text-lg text-gray-400 mt-1">Análisis de negocio para <span id="productNameDisplay" class="font-semibold text-blue-400">Relojes Casio</span>.</p>
+        </header>
+
+        <!-- Sección de Entradas Guiada -->
+        <div id="input-section" class="card">
+            <!-- Barra de Progreso -->
+            <div class="mb-6">
+                <div class="flex justify-between mb-1">
+                    <span class="text-base font-medium text-blue-400">Progreso de Datos</span>
+                    <span id="progress-text" class="text-sm font-medium text-blue-400">Paso 1 de 3</span>
+                </div>
+                <div class="w-full progress-bar-bg rounded-full h-2.5">
+                    <div id="progress-bar" class="progress-bar h-2.5 rounded-full" style="width: 0%"></div>
+                </div>
+            </div>
+            
+            <!-- Paso 1: Datos del Pedido -->
+            <div id="step-1" class="step">
+                <h2 class="text-xl font-bold mb-4">Paso 1: Datos del Pedido</h2>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="input-group"><label for="productName">Producto</label><input type="text" id="productName" value="Relojes Casio"></div>
+                    <div class="input-group"><label for="totalUnits">Unidades</label><input type="number" id="totalUnits" value="8" placeholder="Ej: 8"></div>
+                    <div class="input-group"><label for="salePrice">Precio Venta (DOP)</label><input type="number" id="salePrice" value="2000" placeholder="Ej: 2500"></div>
+                </div>
+            </div>
+            
+            <!-- Paso 2: Gastos del Pedido -->
+            <div id="step-2" class="step hidden">
+                 <h2 class="text-xl font-bold mt-6 mb-4">Paso 2: Gastos del Pedido</h2>
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                    <div class="input-group"><label for="totalOrderCostDOP">Costo Total Pedido (DOP)</label><input type="number" id="totalOrderCostDOP" value="5190" placeholder="Ej: 9950.40"></div>
+                    <div class="input-group"><label for="courierCost">Courier (DOP)</label><input type="number" id="courierCost" value="1000" placeholder="Ej: 574.14"></div>
+                    <div class="input-group"><label for="transportCost">Transporte (DOP)</label><input type="number" id="transportCost" value="0" placeholder="Ej: 70"></div>
+                    <div class="input-group"><label for="marketingPercentage">Inversión Marketing (%)</label><input type="number" id="marketingPercentage" value="4" placeholder="Ej: 10"></div>
+                </div>
+            </div>
+
+            <!-- Paso 3: Meta de Proyección -->
+            <div id="step-3" class="step hidden">
+                <h2 class="text-xl font-bold mt-6 mb-4">Paso 3: Meta y Simulación</h2>
+                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="input-group"><label for="targetRevenue">Meta de Ingresos (DOP)</label><input type="number" id="targetRevenue" value="500000" placeholder="Ej: 500000"></div>
+                 </div>
+            </div>
+        </div>
+
+        <!-- Sección de Resultados (Oculta por defecto) -->
+        <div id="results-section" class="hidden-initial space-y-6">
+             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+                <div class="card"><div class="flex items-center gap-4"><div class="p-3 rounded-full bg-blue-500/20 text-blue-400"><i data-lucide="wallet"></i></div><div><p id="totalSalesDOP" class="metric-value text-2xl">DOP 0,00</p><p class="metric-label">Ventas (Pedido)</p></div></div></div>
+                <div class="card"><div class="flex items-center gap-4"><div class="p-3 rounded-full bg-red-500/20 text-red-400"><i data-lucide="receipt"></i></div><div><p id="totalCostsDOP" class="metric-value text-2xl">DOP 0,00</p><p class="metric-label">Costos (Pedido)</p></div></div></div>
+                <div class="card"><div class="flex items-center gap-4"><div class="p-3 rounded-full bg-green-500/20 text-green-400"><i data-lucide="piggy-bank"></i></div><div><p id="totalNetProfitDOP" class="metric-value text-2xl">DOP 0,00</p><p class="metric-label">Ganancia Neta</p></div></div></div>
+                <div class="card"><div class="flex items-center gap-4"><div class="p-3 rounded-full bg-blue-500/20 text-blue-400"><i data-lucide="pie-chart"></i></div><div><p id="totalGrossMargin" class="metric-value text-2xl">0,00%</p><p class="metric-label">Margen Bruto</p></div></div></div>
+                <div class="card"><div class="flex items-center gap-4"><div class="p-3 rounded-full bg-green-500/20 text-green-400"><i data-lucide="trending-up"></i></div><div><p id="totalNetMargin" class="metric-value text-2xl">0,00%</p><p class="metric-label">Margen Neto</p></div></div></div>
+            </div>
+
+            <div class="card">
+                <div class="flex space-x-2 border-b border-gray-700 mb-4">
+                    <button id="tab-financial" class="tab-button active">Análisis Financiero</button>
+                    <button id="tab-projections" class="tab-button">Proyecciones y Simulación</button>
+                </div>
+                <div id="content-financial" class="tab-content active">
+                    <div class="grid grid-cols-1 md:grid-cols-5 gap-8">
+                        <div class="md:col-span-3" id="unitAnalysis"></div>
+                        <div class="md:col-span-2 border-t md:border-t-0 md:border-l border-gray-700 md:pl-8 pt-4 md:pt-0" id="generalAnalysis"></div>
+                        <div class="md:col-span-5 mt-8" id="financialProjections"></div>
+                        
+                        <!-- Header for Sales Projections with Toggle Button -->
+                        <div class="md:col-span-5 mt-8 flex justify-between items-center border-b border-gray-700 pb-2">
+                            <div>
+                                <h3 class="font-bold text-gray-300 text-xl">Estimaciones de Ventas</h3>
+                                <p class="text-sm text-gray-500">Basado en el pedido actual como ventas de 1 semana.</p>
+                            </div>
+                            <button id="toggleSalesProjections" class="bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg flex items-center gap-2 transition-all text-sm">
+                                <i data-lucide="eye-off"></i>
+                                <span>Ocultar</span>
+                            </button>
+                        </div>
+
+                        <div class="md:col-span-5" id="salesProjections"></div>
+                    </div>
+                </div>
+                <div id="content-projections" class="tab-content">
+                     <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div id="revenueProjectionPlan"></div>
+                        <div id="riskAnalysis" class="border-t md:border-t-0 md:border-l border-gray-700 md:pl-8 pt-4 md:pt-0"></div>
+                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function setupTabs() {
+            const tabs = document.querySelectorAll('.tab-button');
+            const contents = document.querySelectorAll('.tab-content');
+            tabs.forEach(tab => {
+                tab.addEventListener('click', () => {
+                    tabs.forEach(t => t.classList.remove('active'));
+                    contents.forEach(c => c.classList.remove('active'));
+                    tab.classList.add('active');
+                    document.getElementById(`content-${tab.id.split('-')[1]}`).classList.add('active');
+                });
+            });
+        }
+
+        const formatCurrency = (value) => new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'DOP', minimumFractionDigits: 2 }).format(isNaN(value) || !isFinite(value) ? 0 : value);
+        const formatNumber = (value, digits = 0) => new Intl.NumberFormat('es-ES', { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(isNaN(value) || !isFinite(value) ? 0 : value);
+        
+        function manageSteps() {
+            const totalUnits = parseInt(document.getElementById('totalUnits').value) || 0;
+            const salePrice = parseFloat(document.getElementById('salePrice').value) || 0;
+            const totalOrderCostDOP = parseFloat(document.getElementById('totalOrderCostDOP').value) || 0;
+
+            const step2 = document.getElementById('step-2');
+            const step3 = document.getElementById('step-3');
+            const progressBar = document.getElementById('progress-bar');
+            const progressText = document.getElementById('progress-text');
+
+            step2.classList.add('hidden');
+            step3.classList.add('hidden');
+            progressBar.style.width = '33%';
+            progressText.textContent = 'Paso 1 de 3';
+
+            if (totalUnits > 0 && salePrice > 0) {
+                step2.classList.remove('hidden');
+                progressBar.style.width = '66%';
+                progressText.textContent = 'Paso 2 de 3';
+            }
+
+            if (totalUnits > 0 && salePrice > 0 && totalOrderCostDOP > 0) {
+                step3.classList.remove('hidden');
+                progressBar.style.width = '100%';
+                progressText.textContent = 'Paso 3 de 3 - ¡Listo!';
+            }
+        }
+
+        function calculate() {
+            manageSteps();
+
+            const totalUnits = parseInt(document.getElementById('totalUnits').value) || 0;
+            const salePrice = parseFloat(document.getElementById('salePrice').value) || 0;
+            const totalOrderCostDOP = parseFloat(document.getElementById('totalOrderCostDOP').value) || 0;
+            const courierCost = parseFloat(document.getElementById('courierCost').value) || 0;
+            const transportCost = parseFloat(document.getElementById('transportCost').value) || 0;
+            const marketingPercentage = parseFloat(document.getElementById('marketingPercentage').value) || 0;
+            const targetRevenue = parseFloat(document.getElementById('targetRevenue').value) || 0;
+            document.getElementById('productNameDisplay').textContent = document.getElementById('productName').value || 'Producto';
+            
+            const resultsSection = document.getElementById('results-section');
+
+            if (totalUnits > 0 && salePrice > 0 && totalOrderCostDOP > 0) {
+                resultsSection.style.display = 'block';
+            } else {
+                resultsSection.style.display = 'none';
+                return; 
+            }
+
+            const priceVariation = parseFloat(document.getElementById('priceVariationInput')?.value) || 0;
+            const costVariation = parseFloat(document.getElementById('costVariationInput')?.value) || 0;
+
+            const totalSalesDOP = totalUnits * salePrice;
+            const marketingCostDOP = totalSalesDOP * (marketingPercentage / 100);
+            const totalCostsDOP = totalOrderCostDOP + courierCost + transportCost + marketingCostDOP;
+            const totalNetProfitDOP = totalSalesDOP - totalCostsDOP;
+
+            const productCostUnit = totalUnits > 0 ? totalOrderCostDOP / totalUnits : 0;
+            const courierCostUnit = totalUnits > 0 ? courierCost / totalUnits : 0;
+            const transportCostUnit = totalUnits > 0 ? transportCost / totalUnits : 0;
+            const marketingCostUnit = totalUnits > 0 ? marketingCostDOP / totalUnits : 0;
+            const netCostUnit = productCostUnit + courierCostUnit + transportCostUnit + marketingCostUnit;
+            const netProfitUnit = salePrice - netCostUnit;
+
+            const grossProfitUnit = salePrice - productCostUnit;
+            const grossMarginUnitPercentage = salePrice > 0 ? (grossProfitUnit / salePrice) * 100 : 0;
+            const totalGrossProfit = totalSalesDOP - totalOrderCostDOP;
+            const totalGrossMarginPercentage = totalSalesDOP > 0 ? (totalGrossProfit / totalSalesDOP) * 100 : 0;
+
+            const netMarginUnitPercentage = salePrice > 0 ? (netProfitUnit / salePrice) * 100 : 0;
+            const returnOnCost = netCostUnit > 0 ? (netProfitUnit / netCostUnit) * 100 : 0;
+            const netMarginTotalPercentage = totalSalesDOP > 0 ? (totalNetProfitDOP / totalSalesDOP) * 100 : 0;
+            const marketingCostPerSaleAsFraction = (marketingPercentage / 100);
+            const romi = marketingCostDOP > 0 ? (totalNetProfitDOP / marketingCostDOP) * 100 : 0;
+            
+            const fixedCosts = courierCost + transportCost;
+            const contributionMargin = salePrice - productCostUnit - marketingCostUnit;
+            const breakEvenUnits = contributionMargin > 0 ? fixedCosts / contributionMargin : Infinity;
+
+            const unitsForTargetRevenue = salePrice > 0 ? targetRevenue / salePrice : 0;
+            const projectedProductCost = productCostUnit * unitsForTargetRevenue;
+            const projectedCourierCost = courierCostUnit * unitsForTargetRevenue;
+            const projectedMarketingCost = targetRevenue * marketingCostPerSaleAsFraction;
+            const projectedTotalCost = projectedProductCost + projectedCourierCost + transportCost + projectedMarketingCost;
+            const projectedNetProfit = targetRevenue - projectedTotalCost;
+
+            const simulatedSalePrice = salePrice * (1 + priceVariation / 100);
+            const simulatedProductCostUnit = productCostUnit * (1 + costVariation / 100);
+            const unitsForSimulatedRevenue = simulatedSalePrice > 0 ? targetRevenue / simulatedSalePrice : 0;
+            const simulatedVariableProfitPerUnit = simulatedSalePrice - simulatedProductCostUnit - courierCostUnit - (simulatedSalePrice * marketingCostPerSaleAsFraction);
+            const simulatedProjectedProfit = (simulatedVariableProfitPerUnit * unitsForSimulatedRevenue) - transportCost;
+            
+            const simulatedProjectedProductCost = simulatedProductCostUnit * unitsForSimulatedRevenue;
+            const simulatedProjectedCourierCost = courierCostUnit * unitsForSimulatedRevenue;
+            const simulatedProjectedMarketingCost = targetRevenue * marketingCostPerSaleAsFraction;
+            const simulatedProjectedTotalCost = simulatedProjectedProductCost + simulatedProjectedCourierCost + transportCost + simulatedProjectedMarketingCost;
+
+            document.getElementById('totalSalesDOP').textContent = formatCurrency(totalSalesDOP);
+            document.getElementById('totalCostsDOP').textContent = formatCurrency(totalCostsDOP);
+            document.getElementById('totalNetProfitDOP').textContent = formatCurrency(totalNetProfitDOP);
+            document.getElementById('totalNetProfitDOP').className = `metric-value text-2xl ${totalNetProfitDOP >= 0 ? 'positive' : 'negative'}`;
+            document.getElementById('totalGrossMargin').textContent = `${formatNumber(totalGrossMarginPercentage, 2)}%`;
+            document.getElementById('totalNetMargin').textContent = `${formatNumber(netMarginTotalPercentage, 2)}%`;
+
+            const createAnalysisItem = (label, value, valueClass = 'text-gray-200', isSub = false) => `<div class="analysis-item ${isSub ? 'pl-4' : ''}"><p class="text-gray-400">${label}</p><p class="font-bold ${isSub ? 'text-base' : 'text-lg'} ${valueClass}">${value}</p></div>`;
+            
+            document.getElementById('unitAnalysis').innerHTML = `<h3 class="font-bold text-gray-300 mb-2">Análisis por Unidad</h3>` + createAnalysisItem('Precio de Venta', formatCurrency(salePrice), 'text-blue-400') + createAnalysisItem('Costo Neto', formatCurrency(netCostUnit), 'text-amber-400') + createAnalysisItem('C. Producto', formatCurrency(productCostUnit), 'text-gray-200', true) + createAnalysisItem('C. Courier', formatCurrency(courierCostUnit), 'text-gray-200', true) + createAnalysisItem('C. Transporte', formatCurrency(transportCostUnit), 'text-gray-200', true) + createAnalysisItem('C. Marketing', formatCurrency(marketingCostUnit), 'text-gray-200', true) + createAnalysisItem('Ganancia Neta', formatCurrency(netProfitUnit), netProfitUnit >= 0 ? 'positive' : 'negative') + `<hr class="my-2 border-gray-700">` + createAnalysisItem('Margen Bruto (%)', `${formatNumber(grossMarginUnitPercentage, 2)}%`, 'text-blue-400') + createAnalysisItem('Margen Neto (%)', `${formatNumber(netMarginUnitPercentage, 2)}%`, 'text-green-400');
+            
+            document.getElementById('generalAnalysis').innerHTML = `<h3 class="font-bold text-gray-300 mb-2">Métricas Generales (Pedido)</h3>` + createAnalysisItem('Ganancia Bruta Total', formatCurrency(totalGrossProfit), 'text-blue-400') + createAnalysisItem('Ganancia Neta Total', formatCurrency(totalNetProfitDOP), 'text-green-400') + `<hr class="my-2 border-gray-700">` + createAnalysisItem('Retorno sobre Costo', `${formatNumber(returnOnCost, 2)}%`, 'text-green-400') + createAnalysisItem('Punto de Equilibrio', `${isFinite(breakEvenUnits) ? formatNumber(breakEvenUnits, 2) : 'N/A'} unidades`, 'text-amber-400') + createAnalysisItem('ROMI (%)', `${formatNumber(romi, 2)}%`, romi >= 0 ? 'text-purple-400' : 'text-red-400');
+            
+            const paces = [
+                { label: 'en 7 días', days: 7 },
+                { label: 'en 1 mes', days: 30 },
+                { label: 'en 3 meses', days: 90 },
+                { label: 'en 6 meses', days: 180 },
+                { label: 'en 9 meses', days: 270 },
+                { label: 'en 1 año', days: 365 }
+            ];
+            let financialProjectionsHTML = `<h3 class="font-bold text-gray-300 mb-2">Proyecciones de Análisis Financiero</h3><p class="text-sm text-gray-500 mb-4">Ritmo de venta diario necesario para vender las <span class="font-bold text-white">${totalUnits}</span> unidades del pedido inicial en diferentes plazos.</p>`;
+            financialProjectionsHTML += `<div class="bg-gray-800/50 p-4 rounded-lg grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4">`;
+            paces.forEach(pace => {
+                financialProjectionsHTML += `<div class="text-center">
+                    <p class="text-sm text-gray-400">${pace.label}</p>
+                    <p class="text-xl font-bold text-purple-400">${formatNumber(totalUnits / pace.days, 2)}</p>
+                    <p class="text-xs text-gray-500">Unidades/Día</p>
+                </div>`;
+            });
+            financialProjectionsHTML += `</div>`;
+            document.getElementById('financialProjections').innerHTML = financialProjectionsHTML;
+
+            const createPacingHTML = (totalUnits) => {
+                let html = `<div class="mt-3 pt-3 border-t border-gray-700/50"><p class="text-xs text-gray-400 mb-1 text-center">Ritmo de Venta Diario para ${formatNumber(totalUnits)} Unidades</p><div class="grid grid-cols-2 gap-x-4">`;
+                paces.forEach(pace => {
+                    html += `<p class="text-xs text-gray-500">${pace.label}: <span class="font-bold text-purple-400">${formatNumber(totalUnits / pace.days, 2)}</span></p>`;
+                });
+                html += `</div></div>`;
+                return html;
+            };
+
+            const baseDailyUnits = totalUnits / 7;
+            const projections = [
+                { period: '7 Días', days: 7 },
+                { period: '1 Mes', days: 30 },
+                { period: '3 Meses', days: 90 },
+                { period: '1 Año', days: 365 }
+            ];
+
+            let projectionsHTML = `<div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4">`;
+            projections.forEach(p => {
+                const pUnits = baseDailyUnits * p.days;
+                const pRevenue = pUnits * salePrice;
+                const pProfit = pUnits * netProfitUnit;
+                projectionsHTML += `<div class="bg-gray-800/50 p-4 rounded-lg flex flex-col">
+                    <p class="font-bold text-lg text-blue-400">${p.period}</p>
+                    <p class="text-sm text-gray-400">${formatNumber(pUnits)} Unidades</p>
+                    <p class="text-sm text-gray-400">Ingresos: ${formatCurrency(pRevenue)}</p>
+                    <p class="text-sm font-semibold ${pProfit >= 0 ? 'positive' : 'negative'}">Ganancia: ${formatCurrency(pProfit)}</p>
+                    ${createPacingHTML(pUnits)}
+                </div>`;
+            });
+            projectionsHTML += `</div>`;
+            document.getElementById('salesProjections').innerHTML = projectionsHTML;
+
+            const createPlanItem = (label, value, highlight = false) => `<div class="flex justify-between items-baseline ${highlight ? 'bg-green-500/10 p-3 rounded-lg' : 'bg-gray-800/50 p-2 rounded-md'}"><p class="text-sm font-medium ${highlight ? 'text-green-300' : 'text-gray-400'}">${label}</p><p class="font-bold ${highlight ? 'text-xl text-green-300' : 'text-gray-200'}">${value}</p></div>`;
+            
+            let targetProjectionsHTML = `<h3 class="font-bold text-gray-300 mb-2">Plan Base para Ingresar ${formatCurrency(targetRevenue)}</h3>` + createPlanItem('Unidades a Vender (Mes)', `${formatNumber(unitsForTargetRevenue)}`, true) + createPlanItem('Ganancia Neta Estimada', `${formatCurrency(projectedNetProfit)}`, projectedNetProfit >= 0 ? 'positive' : 'negative');
+            
+            targetProjectionsHTML += `<div class="mt-8">`;
+            targetProjectionsHTML += `<h3 class="font-bold text-gray-300 mb-2">Proyecciones a Futuro</h3><p class="text-sm text-gray-500 mb-4">Basado en la meta de ingresos como un objetivo mensual.</p>`;
+            targetProjectionsHTML += `<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">`;
+            
+            const targetProjections = [
+                { period: '1 Mes', days: 30 },
+                { period: '3 Meses', days: 90 },
+                { period: '1 Año', days: 365 }
+            ];
+            
+            targetProjections.forEach(p => {
+                const pUnits = (unitsForTargetRevenue / 30) * p.days;
+                const pRevenue = (targetRevenue / 30) * p.days;
+                const pProfit = (projectedNetProfit / 30) * p.days;
+
+                targetProjectionsHTML += `<div class="bg-gray-800/50 p-4 rounded-lg flex flex-col">
+                    <p class="font-bold text-lg text-blue-400">${p.period}</p>
+                    <p class="text-sm text-gray-400">${formatNumber(pUnits)} Unidades</p>
+                    <p class="text-sm text-gray-400">Ingresos: ${formatCurrency(pRevenue)}</p>
+                    <p class="text-sm font-semibold ${pProfit >= 0 ? 'positive' : 'negative'}">Ganancia: ${formatCurrency(pProfit)}</p>
+                    ${createPacingHTML(pUnits)}
+                </div>`;
+            });
+            
+            targetProjectionsHTML += `</div></div>`;
+            document.getElementById('revenueProjectionPlan').innerHTML = targetProjectionsHTML;
+
+            let riskAnalysisHTML = `
+                <h3 class="font-bold text-gray-300 mb-2">Análisis de Sensibilidad</h3>
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="input-group">
+                        <label for="priceVariationInput">Variación Precio (%)</label>
+                        <input type="number" id="priceVariationInput" value="${priceVariation}" placeholder="Ej: -5">
+                    </div>
+                    <div class="input-group">
+                        <label for="costVariationInput">Variación Costo (%)</label>
+                        <input type="number" id="costVariationInput" value="${costVariation}" placeholder="Ej: 10">
+                    </div>
+                </div>
+                <hr class="my-4 border-gray-700">
+                <h4 class="font-semibold text-gray-300 mb-2">Resultados de Simulación (para la meta de ${formatCurrency(targetRevenue)})</h4>` +
+                createPlanItem('Nuevas Unidades a Vender', `${formatNumber(unitsForSimulatedRevenue)}`, true) + 
+                createPlanItem('Nueva Ganancia Estimada', `${formatCurrency(simulatedProjectedProfit)}`, simulatedProjectedProfit >= 0 ? 'positive' : 'negative') + 
+                `<hr class="my-2 border-gray-700">` +
+                `<p class="font-semibold text-gray-400 text-sm mb-1">Desglose de Gastos (Simulación):</p>` +
+                createAnalysisItem('Costo de Productos', formatCurrency(simulatedProjectedProductCost), 'text-gray-200', true) +
+                createAnalysisItem('Costo de Courier', formatCurrency(simulatedProjectedCourierCost), 'text-gray-200', true) +
+                createAnalysisItem('Costo de Marketing', formatCurrency(simulatedProjectedMarketingCost), 'text-gray-200', true) +
+                createAnalysisItem('Costo Total', formatCurrency(simulatedProjectedTotalCost), 'text-amber-400');
+
+            document.getElementById('riskAnalysis').innerHTML = riskAnalysisHTML;
+
+            attachDynamicListeners();
+            lucide.createIcons();
+        }
+
+        function attachDynamicListeners() {
+            document.getElementById('priceVariationInput')?.addEventListener('input', calculate);
+            document.getElementById('costVariationInput')?.addEventListener('input', calculate);
+        }
+
+        const allInputs = document.querySelectorAll('#input-section input');
+        allInputs.forEach(input => input.addEventListener('input', calculate));
+
+        document.addEventListener('DOMContentLoaded', () => {
+            setupTabs();
+            calculate();
+
+            const toggleButton = document.getElementById('toggleSalesProjections');
+            const salesSection = document.getElementById('salesProjections');
+            const buttonText = toggleButton.querySelector('span');
+            const buttonIcon = toggleButton.querySelector('i');
+
+            toggleButton.addEventListener('click', () => {
+                salesSection.classList.toggle('hidden');
+                if (salesSection.classList.contains('hidden')) {
+                    buttonText.textContent = 'Mostrar';
+                    buttonIcon.setAttribute('data-lucide', 'eye');
+                } else {
+                    buttonText.textContent = 'Ocultar';
+                    buttonIcon.setAttribute('data-lucide', 'eye-off');
+                }
+                lucide.createIcons();
+            });
+        });
+    </script>
+</body>
+</html>
