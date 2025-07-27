@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <!-- METADATOS Y CONFIGURACIÓN INICIAL -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Metrix - Fusión Neón</title>
+
+    <!-- IMPORTACIÓN DE LIBRERÍAS EXTERNAS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Orbitron:wght@700;900&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- LIBRERÍAS PARA EXPORTACIÓN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+    <!-- ESTILOS CSS PERSONALIZADOS (DISEÑO NEON-NOIR) -->
+    <style>
+        /* * ===============================================
+         * DEFINICIÓN DE VARIABLES DE DISEÑO (PALETA NEON-NOIR)
+         * ===============================================
+        */
+        :root {
+            --bg-color: #05070B;
+            --card-color: #10141D;
+            --border-color: rgba(0, 191, 255, 0.2);
+            --text-primary: #E0E0E0;
+            --text-secondary: #8899A6;
+            --accent-neon-blue: #00BFFF;
+            --accent-neon-blue-rgb: 0, 191, 255;
+            --accent-gold: #D4AF37;
+            --accent-emerald: #00C781;
+            --accent-red: #E53E3E;
+        }
+
+        /* * ===============================================
+         * ESTILOS GENERALES Y EFECTO LLUVIA
+         * ===============================================
+        */
+        body { 
+            font-family: 'Plus Jakarta Sans', sans-serif; 
+            background-color: var(--bg-color); 
+            color: var(--text-primary); 
+            overflow-x: hidden;
+        }
+        #rain-canvas {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: -2;
+            pointer-events: none;
+        }
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: radial-gradient(circle at var(--x, 50%) var(--y, 50%), rgba(var(--accent-neon-blue-rgb), 0.08), transparent 40%);
+            z-index: -1;
+            pointer-events: none;
+            transition: background 0.2s ease-out;
+        }
+
+        /* * ===============================================
+         * ESTILO DE TARJETAS (CARDS) HOLOGRÁFICAS
+         * ===============================================
+        */
+        .card { 
+            background-color: rgba(16, 20, 29, 0.7);
+            backdrop-filter: blur(15px);
+            border-radius: 1rem; 
+            border: 1px solid var(--border-color); 
+            padding: 2.5rem; 
+            transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+            box-shadow: 0 0 20px rgba(var(--accent-neon-blue-rgb), 0.1), inset 0 0 15px rgba(var(--accent-neon-blue-rgb), 0.05);
+        }
+        .card:hover {
+            border-color: rgba(var(--accent-neon-blue-rgb), 0.5);
+            transform: translateY(-5px);
+            box-shadow: 0 0 35px rgba(var(--accent-neon-blue-rgb), 0.2), inset 0 0 20px rgba(var(--accent-neon-blue-rgb), 0.1);
+        }
+
+        /* * ===============================================
+         * ESTILOS PARA CAMPOS DE ENTRADA (INPUTS) FUTURISTAS
+         * ===============================================
+        */
+        .input-wrapper { position: relative; }
+        .input-wrapper .icon {
+            position: absolute; top: 50%; left: 1rem;
+            transform: translateY(-50%); color: var(--text-secondary);
+            pointer-events: none; transition: color 0.3s;
+        }
+        .input-group label { 
+            font-family: 'Orbitron', sans-serif;
+            display: block; color: var(--text-secondary); 
+            font-weight: 700; font-size: 0.8rem; 
+            margin-bottom: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em;
+        }
+        .input-group input { 
+            background-color: #05070B; 
+            border: 1px solid #333; 
+            color: var(--text-primary); 
+            padding: 1rem 1rem 1rem 3.5rem;
+            border-radius: 0.5rem; width: 100%; 
+            transition: all 0.3s ease; font-weight: 500;
+        }
+        .input-group input:focus { 
+            outline: none; border-color: var(--accent-neon-blue); 
+            box-shadow: 0 0 0 3px rgba(var(--accent-neon-blue-rgb), 0.3); 
+        }
+        .input-group input:focus + .icon { color: var(--accent-neon-blue); }
+
+        /* * ===============================================
+         * ESTILOS PARA MÉTRICAS Y TEXTOS DE RESULTADOS
+         * ===============================================
+        */
+        .metric-value { font-weight: 700; }
+        .metric-label { font-family: 'Orbitron', sans-serif; color: var(--text-secondary); font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.05em;}
+        .positive { color: var(--accent-emerald); text-shadow: 0 0 10px rgba(0, 199, 129, 0.5); }
+        .negative { color: var(--accent-red); text-shadow: 0 0 10px rgba(229, 62, 62, 0.5); }
+        .analysis-item { display: flex; justify-content: space-between; align-items: center; padding: 1.25rem 0; border-bottom: 1px solid var(--border-color); }
+        .analysis-item:last-child { border-bottom: none; }
+
+        /* * ===============================================
+         * ESTILOS PARA PESTAÑAS DE NAVEGACIÓN (TABS)
+         * ===============================================
+        */
+        .tab-button { 
+            font-family: 'Orbitron', sans-serif;
+            padding: 0.75rem 1.5rem; border-radius: 0.5rem; 
+            font-weight: 700; cursor: pointer; 
+            transition: all 0.3s ease; border: 1px solid var(--border-color); 
+            background-color: transparent; color: var(--text-secondary);
+        }
+        .tab-button.active { 
+            background-color: var(--accent-neon-blue); color: #05070B;
+            box-shadow: 0 0 20px rgba(var(--accent-neon-blue-rgb), 0.4);
+            border-color: var(--accent-neon-blue);
+        }
+        .tab-button:not(.active):hover { color: var(--text-primary); background-color: rgba(var(--accent-neon-blue-rgb), 0.1); }
+        
+        .tab-content {
+            display: none;
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        .tab-content.active {
+            display: block;
+        }
+
+        /* * ===============================================
+         * ANIMACIONES Y TRANSICIONES
+         * ===============================================
+        */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .hidden-initial { display: none; }
+        .step { transition: opacity 0.5s ease-in-out, transform 0.5s ease-in-out; opacity: 1; transform: translateY(0); }
+        .step.hidden { opacity: 0; transform: translateY(20px); position: absolute; pointer-events: none; }
+        .results-section > * {
+            animation: slideInUp 0.8s cubic-bezier(0.25, 0.8, 0.25, 1) both;
+        }
+        @keyframes slideInUp { from { opacity: 0; transform: translateY(50px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* * ===============================================
+         * COMPONENTES DE UI (MODAL, BOTÓN, ETC.)
+         * ===============================================
+        */
+        .progress-bar-bg { background-color: #2a2a2a; border-radius: 99px; }
+        .progress-bar { background: linear-gradient(90deg, #0077B3, var(--accent-neon-blue)); transition: width 0.8s cubic-bezier(0.25, 0.8, 0.25, 1); }
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background-color: rgba(0, 0, 0, 0.8); backdrop-filter: blur(8px);
+            display: flex; align-items: center; justify-content: center;
+            z-index: 1000; opacity: 0; visibility: hidden;
+            transition: opacity 0.4s ease, visibility 0.4s ease;
+        }
+        .modal-overlay.active { opacity: 1; visibility: visible; }
+        .modal-content {
+            background-color: var(--card-color); border: 1px solid var(--border-color);
+            padding: 2.5rem; border-radius: 1rem;
+            width: 90%; max-width: 650px;
+            transform: scale(0.95) translateY(20px); transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+        }
+        .modal-overlay.active .modal-content { transform: scale(1) translateY(0); }
+        
+        .fab-button {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            width: 4rem;
+            height: 4rem;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(145deg, #3CF, var(--accent-neon-blue));
+            color: #05070B;
+            box-shadow: 0 0 25px rgba(var(--accent-neon-blue-rgb), 0.5);
+            transition: all 0.3s ease;
+            z-index: 999;
+            border: none;
+            cursor: pointer;
+        }
+        .fab-button:hover {
+            transform: scale(1.1);
+            box-shadow: 0 0 35px rgba(var(--accent-neon-blue-rgb), 0.7);
+        }
+        .fab-button:disabled {
+            background: #555;
+            cursor: not-allowed;
+            box-shadow: none;
+            transform: scale(1);
+            opacity: 0.5;
+        }
+
+        /* Estilo para el interruptor moderno */
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 28px;
+        }
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .toggle-switch .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #333;
+            transition: .4s;
+            border-radius: 28px;
+        }
+        .toggle-switch .slider:before {
+            position: absolute;
+            content: "";
+            height: 20px;
+            width: 20px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        .toggle-switch input:checked + .slider {
+            background-color: var(--accent-neon-blue);
+        }
+        .toggle-switch input:focus + .slider {
+            box-shadow: 0 0 1px var(--accent-neon-blue);
+        }
+        .toggle-switch input:checked + .slider:before {
+            transform: translateX(22px);
+        }
+    </style>
+</head>
+<body class="p-4 md:p-6 lg:p-8">
+    <canvas id="rain-canvas"></canvas>
+
+    <!-- CONTENEDOR PRINCIPAL -->
+    <div class="max-w-screen-xl mx-auto space-y-10 pb-24">
+        
+        <!-- CABECERA DE LA APLICACIÓN -->
+        <header class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div>
+                <h1 class="text-3xl md:text-4xl font-extrabold tracking-tight" style="font-family: 'Orbitron', sans-serif;">Metrix</h1>
+                <p class="text-lg text-gray-400 mt-1">Análisis de Rentabilidad para <span id="productNameDisplay" class="font-semibold" style="color: var(--accent-neon-blue);">Tu Producto</span>.</p>
+            </div>
+        </header>
+
+        <!-- SECCIÓN DE ENTRADA DE DATOS -->
+        <div id="input-section" class="card">
+            <div class="mb-8">
+                <div class="flex justify-between items-end mb-2">
+                    <span class="text-base font-bold uppercase tracking-wider" style="color: var(--accent-neon-blue);">Progreso de Datos</span>
+                    <span id="progress-text" class="text-sm font-medium" style="color: var(--accent-neon-blue);">Paso 1 de 3</span>
+                </div>
+                <div class="w-full progress-bar-bg h-1.5"><div id="progress-bar" class="progress-bar h-1.5" style="width: 0%"></div></div>
+            </div>
+            
+            <div id="step-1" class="step">
+                <h2 class="text-2xl font-bold mb-6" style="font-family: 'Orbitron', sans-serif;">Paso 1: Datos del Pedido</h2>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                    <div class="input-group"><label for="productName">Producto</label><div class="input-wrapper"><input type="text" id="productName" value="" placeholder="Ej: Relojes Casio"><i data-lucide="package" class="icon"></i></div></div>
+                    <div class="input-group"><label for="totalUnits">Unidades</label><div class="input-wrapper"><input type="number" id="totalUnits" value="" placeholder="Ej: 8"><i data-lucide="hash" class="icon"></i></div></div>
+                    <div class="input-group"><label for="salePrice">Precio Venta (DOP)</label><div class="input-wrapper"><input type="number" id="salePrice" value="" placeholder="Ej: 2000"><i data-lucide="dollar-sign" class="icon"></i></div></div>
+                </div>
+            </div>
+            
+            <div id="step-2" class="step hidden">
+                 <h2 class="text-2xl font-bold mb-6" style="font-family: 'Orbitron', sans-serif;">Paso 2: Gastos del Pedido</h2>
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
+                    <div class="input-group"><label for="totalOrderCostDOP">Costo Total Pedido</label><div class="input-wrapper"><input type="number" id="totalOrderCostDOP" value="" placeholder="Ej: 5190"><i data-lucide="receipt" class="icon"></i></div></div>
+                    <div class="input-group"><label for="courierCost">Courier</label><div class="input-wrapper"><input type="number" id="courierCost" value="" placeholder="Ej: 1000"><i data-lucide="truck" class="icon"></i></div></div>
+                    <div class="input-group"><label for="transportCostUnit">Transporte / Unid.</label><div class="input-wrapper"><input type="number" id="transportCostUnit" value="0" placeholder="Ej: 10"><i data-lucide="navigation" class="icon"></i></div></div>
+                    <div class="input-group"><label for="marketingPercentage">Marketing (%)</label><div class="input-wrapper"><input type="number" id="marketingPercentage" value="0" placeholder="Ej: 4"><i data-lucide="megaphone" class="icon"></i></div></div>
+                </div>
+            </div>
+
+            <div id="step-3" class="step hidden">
+                <h2 class="text-2xl font-bold mb-6" style="font-family: 'Orbitron', sans-serif;">Paso 3: Meta y Simulación</h2>
+                 <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                    <div class="input-group"><label for="targetRevenue">Meta de Ingresos</label><div class="input-wrapper"><input type="number" id="targetRevenue" value="" placeholder="Ej: 500000"><i data-lucide="target" class="icon"></i></div></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECCIÓN DE RESULTADOS -->
+        <div id="results-section" class="hidden-initial results-section space-y-8">
+             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
+                <!-- KPI Adaptativos -->
+                <div id="kpi-sales" class="card"></div>
+                <div id="kpi-costs" class="card"></div>
+                <div id="kpi-profit" class="card"></div>
+                <div id="kpi-gross-margin" class="card"></div>
+                <div id="kpi-net-margin" class="card"></div>
+             </div>
+
+            <div class="card">
+                <div class="flex justify-center border-b border-gray-800 mb-6">
+                    <div class="bg-black/20 p-1.5 rounded-lg flex space-x-2">
+                        <button id="tab-financial" class="tab-button active">Análisis Financiero</button>
+                        <button id="tab-projections" class="tab-button">Proyecciones y Simulación</button>
+                    </div>
+                </div>
+                <div id="content-financial" class="tab-content active">
+                    <div class="grid grid-cols-1 gap-12">
+                        <div id="orderAnalysis"></div>
+                        <div id="salesPaceAnalysis"></div>
+                        <div>
+                            <div class="flex justify-between items-center mb-4">
+                                <h3 class="font-bold text-xl" style="font-family: 'Orbitron', sans-serif;">Estimaciones de Ventas (Pedido Actual)</h3>
+                                <div class="flex items-center gap-3">
+                                    <span class="text-sm text-gray-400">Mostrar Estimaciones</span>
+                                    <label for="toggleSalesProjections" class="toggle-switch">
+                                        <input type="checkbox" id="toggleSalesProjections">
+                                        <span class="slider"></span>
+                                    </label>
+                                </div>
+                            </div>
+                            <div id="financialProjections" class="hidden"></div>
+                        </div>
+                    </div>
+                </div>
+                <div id="content-projections" class="tab-content">
+                     <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        <div id="revenueProjectionPlan"></div>
+                        <div id="riskAnalysis" class="border-t lg:border-t-0 lg:border-l border-gray-800 lg:pl-8 pt-6 lg:pt-0"></div>
+                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- BOTÓN FLOTANTE PARA RESUMEN -->
+    <button id="execSummaryBtn" class="fab-button">
+        <i data-lucide="bar-chart-3"></i>
+    </button>
+
+    <!-- VENTANA MODAL PARA RESUMEN EJECUTIVO -->
+    <div id="summaryModal" class="modal-overlay">
+        <div id="summaryModalContent" class="modal-content space-y-6">
+            <!-- El contenido se genera dinámicamente -->
+        </div>
+    </div>
+
+    <!-- SCRIPT DE JAVASCRIPT -->
+    <script>
+        // ===================================================================================
+        // --- BLOQUE DE LÓGICA DE CÁLCULO (NÚCLEO FUNCIONAL) ---
+        // ===================================================================================
+        const formatCurrency = (value) => new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'DOP', minimumFractionDigits: 2 }).format(isNaN(value) || !isFinite(value) ? 0 : value);
+        const formatNumber = (value, digits = 2) => new Intl.NumberFormat('es-ES', { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(isNaN(value) || !isFinite(value) ? 0 : value);
+        let calculatedData = {};
+
+        function calculate() {
+            const inputs = {
+                totalUnits: parseInt(document.getElementById('totalUnits').value) || 0,
+                salePrice: parseFloat(document.getElementById('salePrice').value) || 0,
+                totalOrderCostDOP: parseFloat(document.getElementById('totalOrderCostDOP').value) || 0,
+                courierCost: parseFloat(document.getElementById('courierCost').value) || 0,
+                transportCostUnit: parseFloat(document.getElementById('transportCostUnit').value) || 0,
+                marketingPercentage: parseFloat(document.getElementById('marketingPercentage').value) || 0,
+                targetRevenue: parseFloat(document.getElementById('targetRevenue').value) || 0,
+                productName: document.getElementById('productName').value || 'Tu Producto',
+                priceVariation: parseFloat(document.getElementById('priceVariationInput')?.value) || 0,
+                costVariation: parseFloat(document.getElementById('costVariationInput')?.value) || 0,
+            };
+            
+            manageSteps(inputs);
+            document.getElementById('productNameDisplay').textContent = inputs.productName;
+
+            const resultsSection = document.getElementById('results-section');
+            const execSummaryBtn = document.getElementById('execSummaryBtn');
+            if (inputs.totalUnits > 0 && inputs.salePrice > 0 && inputs.totalOrderCostDOP > 0) {
+                resultsSection.style.display = 'block';
+                execSummaryBtn.disabled = false;
+            } else {
+                resultsSection.style.display = 'none';
+                execSummaryBtn.disabled = true;
+                return;
+            }
+            
+            const c = {};
+            c.totalSalesDOP = inputs.totalUnits * inputs.salePrice;
+            c.marketingCostDOP = c.totalSalesDOP * (inputs.marketingPercentage / 100);
+            c.totalTransportCost = inputs.transportCostUnit * inputs.totalUnits;
+            c.totalCostsDOP = inputs.totalOrderCostDOP + inputs.courierCost + c.totalTransportCost + c.marketingCostDOP;
+            c.totalNetProfitDOP = c.totalSalesDOP - c.totalCostsDOP;
+            c.productCostUnit = inputs.totalUnits > 0 ? inputs.totalOrderCostDOP / inputs.totalUnits : 0;
+            c.courierCostUnit = inputs.totalUnits > 0 ? inputs.courierCost / inputs.totalUnits : 0;
+            c.transportCostUnit = inputs.transportCostUnit;
+            c.marketingCostUnit = inputs.totalUnits > 0 ? c.marketingCostDOP / inputs.totalUnits : 0;
+            c.netCostUnit = c.productCostUnit + c.courierCostUnit + c.transportCostUnit + c.marketingCostUnit;
+            c.netProfitUnit = inputs.salePrice - c.netCostUnit;
+            c.grossProfitUnit = inputs.salePrice - c.productCostUnit;
+            c.grossMarginUnitPercentage = inputs.salePrice > 0 ? (c.grossProfitUnit / inputs.salePrice) * 100 : 0;
+            c.totalGrossProfit = c.totalSalesDOP - inputs.totalOrderCostDOP;
+            c.totalGrossMarginPercentage = c.totalSalesDOP > 0 ? (c.totalGrossProfit / c.totalSalesDOP) * 100 : 0;
+            c.netMarginUnitPercentage = inputs.salePrice > 0 ? (c.netProfitUnit / inputs.salePrice) * 100 : 0;
+            c.roi = c.totalCostsDOP > 0 ? (c.totalNetProfitDOP / c.totalCostsDOP) * 100 : 0;
+            c.netMarginTotalPercentage = c.totalSalesDOP > 0 ? (c.totalNetProfitDOP / c.totalSalesDOP) * 100 : 0;
+            c.marketingCostPerSaleAsFraction = (inputs.marketingPercentage / 100);
+            c.romi = c.marketingCostDOP > 0 ? (c.totalNetProfitDOP / c.marketingCostDOP) * 100 : 0;
+            c.fixedCosts = inputs.courierCost;
+            c.variableCostPerUnit = c.productCostUnit + c.transportCostUnit + c.marketingCostUnit;
+            c.contributionMargin = inputs.salePrice - c.variableCostPerUnit;
+            c.breakEvenUnits = c.contributionMargin > 0 ? c.fixedCosts / c.contributionMargin : Infinity;
+            c.unitsForTargetRevenue = inputs.salePrice > 0 ? inputs.targetRevenue / inputs.salePrice : 0;
+            c.projectedNetProfit = (c.contributionMargin * c.unitsForTargetRevenue) - c.fixedCosts;
+            c.simulatedSalePrice = inputs.salePrice * (1 + inputs.priceVariation / 100);
+            c.simulatedProductCostUnit = c.productCostUnit * (1 + inputs.costVariation / 100);
+            c.unitsForSimulatedRevenue = c.simulatedSalePrice > 0 ? inputs.targetRevenue / c.simulatedSalePrice : 0;
+            c.simulatedVariableProfitPerUnit = c.simulatedSalePrice - c.simulatedProductCostUnit - c.transportCostUnit - (c.simulatedSalePrice * c.marketingCostPerSaleAsFraction);
+            c.simulatedProjectedProfit = (c.simulatedVariableProfitPerUnit * c.unitsForSimulatedRevenue) - inputs.courierCost;
+            c.simulatedProjectedProductCost = c.simulatedProductCostUnit * c.unitsForSimulatedRevenue;
+            c.simulatedProjectedTransportCost = c.transportCostUnit * c.unitsForSimulatedRevenue;
+            c.simulatedProjectedMarketingCost = inputs.targetRevenue * c.marketingCostPerSaleAsFraction;
+            c.simulatedProjectedTotalCost = c.simulatedProjectedProductCost + inputs.courierCost + c.simulatedProjectedTransportCost + c.simulatedProjectedMarketingCost;
+            
+            calculatedData = { ...inputs, ...c };
+            renderAllSections();
+        }
+
+        // ===================================================================================
+        // --- BLOQUE DE RENDERIZADO (UI) ---
+        // ===================================================================================
+        function renderAllSections() {
+            renderKPIs();
+            renderOrderAnalysis();
+            renderSalesPaceAnalysis();
+            renderFinancialProjections();
+            renderTargetPlan();
+            renderRiskAnalysis();
+            lucide.createIcons();
+            attachDynamicListeners();
+        }
+
+        function renderKPIs() {
+            const { totalSalesDOP, salePrice, totalCostsDOP, netCostUnit, totalNetProfitDOP, netProfitUnit } = calculatedData;
+            
+            const createKpiCard = (id, label, value, subValue) => {
+                const kpiCard = document.getElementById(id);
+                kpiCard.innerHTML = `
+                    <p class="metric-label">${label}</p>
+                    <p class="metric-value text-2xl my-1">${value}</p>
+                    <p class="text-xs text-gray-400 mt-1">${subValue}</p>
+                `;
+            };
+
+            createKpiCard('kpi-sales', 'Ventas', formatCurrency(totalSalesDOP), `${formatCurrency(salePrice)} / Unid.`);
+            createKpiCard('kpi-costs', 'Costos', formatCurrency(totalCostsDOP), `${formatCurrency(netCostUnit)} / Unid.`);
+            createKpiCard('kpi-profit', 'Beneficio Neto', formatCurrency(totalNetProfitDOP), `${formatCurrency(netProfitUnit)} / Unid.`);
+            createKpiCard('kpi-gross-margin', 'Margen Bruto', `${formatNumber(calculatedData.totalGrossMarginPercentage, 2)}%`, `Beneficio vs Venta`);
+            createKpiCard('kpi-net-margin', 'Margen Neto', `${formatNumber(calculatedData.netMarginTotalPercentage, 2)}%`, `Eficiencia Real`);
+            
+            document.getElementById('kpi-profit').querySelector('.metric-value').className = `metric-value text-2xl my-1 ${totalNetProfitDOP >= 0 ? 'positive' : 'negative'}`;
+            document.getElementById('kpi-net-margin').querySelector('.metric-value').className = `metric-value text-2xl my-1 ${calculatedData.netMarginTotalPercentage >= 0 ? 'positive' : 'negative'}`;
+        }
+
+        function renderOrderAnalysis() {
+            const { 
+                totalUnits, totalSalesDOP, salePrice, 
+                totalCostsDOP, netCostUnit, totalOrderCostDOP, productCostUnit,
+                courierCost, courierCostUnit, totalTransportCost, transportCostUnit,
+                marketingCostDOP, marketingCostUnit, totalNetProfitDOP, netProfitUnit,
+                totalGrossMarginPercentage, netMarginTotalPercentage
+            } = calculatedData;
+
+            let html = `<div class="flex justify-between items-center mb-4">
+                            <h3 class="font-bold text-xl" style="font-family: 'Orbitron', sans-serif;">Análisis General del Pedido</h3>
+                            <span class="bg-gray-800 text-gray-300 text-sm font-bold px-3 py-1 rounded-full">Total de Unidades: ${totalUnits}</span>
+                        </div>`;
+
+            const createItem = (label, totalValue, unitValue, valClass = '', isSub = false) => `
+                <div class="analysis-item ${isSub ? 'pl-4' : ''}">
+                    <p class="text-gray-400">${label}</p>
+                    <div class="text-right">
+                        <p class="font-bold text-lg ${valClass}">${formatCurrency(totalValue)}</p>
+                        <p class="text-xs text-gray-500">${formatCurrency(unitValue)} / Unid.</p>
+                    </div>
+                </div>`;
+            
+            const createPercentageItem = (label, totalPercent, valClass = '') => `
+                <div class="analysis-item">
+                    <p class="text-gray-400">${label}</p>
+                    <p class="font-bold text-lg ${valClass}">${formatNumber(totalPercent, 2)}%</p>
+                </div>`;
+
+            html += createItem('Ingresos Totales (Venta)', totalSalesDOP, salePrice, 'text-gold-400');
+            html += createItem('Costo Neto Total', totalCostsDOP, netCostUnit, 'text-amber-400');
+            html += createItem('C. Producto', totalOrderCostDOP, productCostUnit, '', true);
+            html += createItem('C. Courier', courierCost, courierCostUnit, '', true);
+            html += createItem('C. Transporte', totalTransportCost, transportCostUnit, '', true);
+            html += createItem('C. Marketing', marketingCostDOP, marketingCostUnit, '', true);
+            html += createItem('Beneficio Neto Total', totalNetProfitDOP, netProfitUnit, totalNetProfitDOP >= 0 ? 'positive' : 'negative');
+            html += createPercentageItem('Margen Bruto', totalGrossMarginPercentage, 'text-gold-400');
+            html += createPercentageItem('Margen Neto', netMarginTotalPercentage, netMarginTotalPercentage >= 0 ? 'positive' : 'negative');
+            
+            document.getElementById('orderAnalysis').innerHTML = html;
+        }
+        
+        function renderSalesPaceAnalysis() {
+            const { totalUnits } = calculatedData;
+            if (totalUnits <= 0) {
+                document.getElementById('salesPaceAnalysis').innerHTML = '';
+                return;
+            }
+
+            let html = `<h3 class="font-bold text-xl mb-2" style="font-family: 'Orbitron', sans-serif;">Proyecciones de Análisis Financiero</h3>
+                        <p class="text-sm text-gray-500 mb-4">Ritmo de venta diario necesario para vender las <strong>${totalUnits}</strong> unidades del pedido inicial en diferentes plazos.</p>
+                        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">`;
+            
+            const periods = [
+                { label: 'en 7 días', days: 7 }, { label: 'en 1 mes', days: 30 },
+                { label: 'en 3 meses', days: 90 }, { label: 'en 6 meses', days: 180 },
+                { label: 'en 9 meses', days: 270 }, { label: 'en 12 meses', days: 365 }
+            ];
+
+            periods.forEach(p => {
+                const dailyRate = totalUnits / p.days;
+                html += `<div class="bg-black/20 p-4 rounded-lg text-center">
+                            <p class="text-sm text-gray-400">${p.label}</p>
+                            <p class="text-2xl font-bold my-2" style="color: var(--accent-neon-blue);">${formatNumber(dailyRate, 2)}</p>
+                            <p class="text-xs text-gray-500 uppercase">Unidades/Día</p>
+                         </div>`;
+            });
+
+            html += `</div>`;
+            document.getElementById('salesPaceAnalysis').innerHTML = html;
+        }
+
+
+        function renderFinancialProjections() {
+            const { totalUnits, salePrice, netProfitUnit } = calculatedData;
+            let html = `<p class="text-sm text-gray-500 mb-4">Basado en vender el inventario actual cada 7 días.</p>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">`;
+            const projections = [{ period: '7 Días', days: 7 }, { period: '1 Mes', days: 30 }, { period: '3 Meses', days: 90 }, { period: '1 Año', days: 365 }];
+            const baseDailyUnits = totalUnits > 0 ? totalUnits / 7 : 0;
+            
+            projections.forEach(p => { 
+                const pUnits = baseDailyUnits * p.days; 
+                const pRevenue = pUnits * salePrice; 
+                const pProfit = pUnits * netProfitUnit; 
+                html += `<div class="bg-black/20 p-4 rounded-lg">
+                    <p class="font-bold text-lg" style="color: var(--accent-neon-blue);">${p.period}</p>
+                    <p class="text-sm text-gray-400">${formatNumber(pUnits, 0)} Unidades</p>
+                    <p class="text-sm text-gray-400">Ingresos: ${formatCurrency(pRevenue)}</p>
+                    <p class="text-sm font-semibold ${pProfit >= 0 ? 'positive' : 'negative'}">Beneficio: ${formatCurrency(pProfit)}</p>
+                    ${createPacingHTML(pUnits)}
+                </div>`; 
+            });
+            html += `</div>`;
+            document.getElementById('financialProjections').innerHTML = html;
+        }
+
+        function createPacingHTML(pUnits, baseDays = 30) {
+             if (pUnits <= 0) return '';
+            let html = `<div class="mt-3 pt-3 border-t border-gray-700/50"><p class="text-xs text-gray-400 mb-1 text-center">Ritmo de Venta Diario</p><div class="grid grid-cols-2 gap-x-4">`;
+            const paces = [
+                { label: '7d', days: 7 }, { label: '1m', days: 30 }, 
+                { label: '3m', days: 90 }, { label: '6m', days: 180 },
+                { label: '12m', days: 365 }
+            ];
+            paces.forEach(pace => { 
+                html += `<p class="text-xs text-gray-500">${pace.label}: <span class="font-bold" style="color: var(--accent-neon-blue);">${formatNumber(pUnits / pace.days, 2)}</span></p>`;
+            });
+            html += `</div></div>`;
+            return html;
+        };
+        
+        function renderTargetPlan() {
+            const { targetRevenue, unitsForTargetRevenue, projectedNetProfit } = calculatedData;
+            const createItem = (label, value, valClass = '') => `<div class="analysis-item"><p class="text-gray-400">${label}</p><p class="font-bold text-lg ${valClass}">${value}</p></div>`;
+            let html = `<h3 class="font-bold text-xl mb-4" style="font-family: 'Orbitron', sans-serif;">Plan para Meta de ${formatCurrency(targetRevenue)}</h3><div class="space-y-2 bg-black/20 p-4 rounded-lg">` + createItem('Unidades a Vender (Mes)', `${formatNumber(unitsForTargetRevenue, 0)}`, 'text-gold-300') + createItem('Beneficio Neto Estimado', `${formatCurrency(projectedNetProfit)}`, projectedNetProfit >= 0 ? 'positive' : 'negative') + `</div>`;
+            
+            html += `<h3 class="font-bold text-xl mt-8 mb-4" style="font-family: 'Orbitron', sans-serif;">Proyecciones a Futuro (con Meta)</h3>`;
+            html += `<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">`;
+            const targetProjections = [{ period: '1 Mes', days: 30 }, { period: '3 Meses', days: 90 }, { period: '1 Año', days: 365 }];
+            targetProjections.forEach(p => {
+                const pUnits = (unitsForTargetRevenue / 30) * p.days;
+                const pRevenue = (targetRevenue / 30) * p.days;
+                const pProfit = (projectedNetProfit / 30) * p.days;
+                html += `<div class="bg-black/20 p-4 rounded-lg">
+                    <p class="font-bold text-lg" style="color: var(--accent-neon-blue);">${p.period}</p>
+                    <p class="text-sm text-gray-400">${formatNumber(pUnits, 0)} Unidades</p>
+                    <p class="text-sm text-gray-400">Ingresos: ${formatCurrency(pRevenue)}</p>
+                    <p class="text-sm font-semibold ${pProfit >= 0 ? 'positive' : 'negative'}">Beneficio: ${formatCurrency(pProfit)}</p>
+                    ${createPacingHTML(pUnits, p.days)}
+                </div>`;
+            });
+            html += `</div>`;
+            document.getElementById('revenueProjectionPlan').innerHTML = html;
+        }
+
+        function renderRiskAnalysis() {
+            const { priceVariation, costVariation, targetRevenue, unitsForSimulatedRevenue, simulatedProjectedProfit, simulatedProjectedProductCost, simulatedProjectedTransportCost, simulatedProjectedMarketingCost, simulatedProjectedTotalCost, courierCost } = calculatedData;
+            const createItem = (label, value, valClass = '', isSub = false) => `<div class="analysis-item ${isSub ? 'pl-4' : ''}"><p class="text-gray-400">${label}</p><p class="font-bold ${isSub ? 'text-base' : 'text-lg'} ${valClass}">${value}</p></div>`;
+            let html = `<h3 class="font-bold text-xl mb-4" style="font-family: 'Orbitron', sans-serif;">Análisis de Sensibilidad</h3><div class="grid grid-cols-2 gap-4 mb-6"><div class="input-group"><label for="priceVariationInput">Variación Precio (%)</label><div class="input-wrapper"><input type="number" id="priceVariationInput" value="${priceVariation}" placeholder="Ej: -5"><i data-lucide="trending-up" class="icon"></i></div></div><div class="input-group"><label for="costVariationInput">Variación Costo (%)</label><div class="input-wrapper"><input type="number" id="costVariationInput" value="${costVariation}" placeholder="Ej: 10"><i data-lucide="trending-down" class="icon"></i></div></div></div><h4 class="font-semibold text-gray-300 mb-2">Resultados de Simulación (para la meta de ${formatCurrency(targetRevenue)})</h4><div class="space-y-2 bg-black/20 p-4 rounded-lg">` + createItem('Nuevas Unidades a Vender', `${formatNumber(unitsForSimulatedRevenue, 0)}`, 'text-gold-300') + createItem('Nuevo Beneficio Estimado', `${formatCurrency(simulatedProjectedProfit)}`, simulatedProjectedProfit >= 0 ? 'positive' : 'negative') + `</div><p class="font-semibold text-gray-400 text-sm mt-4 mb-1">Desglose de Gastos (Simulación):</p>` + createItem('Costo de Productos', formatCurrency(simulatedProjectedProductCost), '', true) + createItem('Costo de Courier', formatCurrency(courierCost), '', true) + createItem('Costo de Transporte', formatCurrency(simulatedProjectedTransportCost), '', true) + createItem('Costo de Marketing', formatCurrency(simulatedProjectedMarketingCost), '', true) + createItem('Costo Total', formatCurrency(simulatedProjectedTotalCost), 'text-amber-400');
+            document.getElementById('riskAnalysis').innerHTML = html;
+        }
+        
+        // ===================================================================================
+        // --- BLOQUE DE EXPORTACIÓN Y RESUMEN ---
+        // ===================================================================================
+        function generateExecutiveSummary() {
+            const { productName, totalNetProfitDOP, netMarginTotalPercentage, roi, breakEvenUnits, netProfitUnit, totalCostsDOP } = calculatedData;
+            const isProfit = totalNetProfitDOP >= 0;
+
+            let summaryText = `El análisis para <strong>${productName}</strong> muestra un <strong>beneficio neto total de <span class="${isProfit ? 'positive' : 'negative'}">${formatCurrency(totalNetProfitDOP)}</span></strong> sobre una inversión total de <strong>${formatCurrency(totalCostsDOP)}</strong>. Esto se traduce en un <strong>Retorno de la Inversión (ROI) del <span class="${roi >= 0 ? 'positive' : 'negative'}">${formatNumber(roi)}%</span></strong> y un <strong>Margen Neto del ${formatNumber(netMarginTotalPercentage)}%</strong>. Cada unidad genera un beneficio de <strong>${formatCurrency(netProfitUnit)}</strong>. Se necesita vender <strong>${isFinite(breakEvenUnits) ? formatNumber(breakEvenUnits) : 'N/A'} unidades</strong> para alcanzar el punto de equilibrio.`;
+            
+            let conclusion = '';
+            if (roi > 20) {
+                conclusion = '<strong>Conclusión:</strong> La rentabilidad de este pedido es <strong>excelente</strong>. El alto ROI y margen neto indican una operación muy eficiente y lucrativa.';
+            } else if (roi > 5) {
+                conclusion = '<strong>Conclusión:</strong> La rentabilidad de este pedido es <strong>buena</strong>. Ofrece un retorno sólido, aunque se podrían explorar optimizaciones de costos o precios para mejorar aún más el margen.';
+            } else if (roi >= 0) {
+                conclusion = '<strong>Conclusión:</strong> La rentabilidad de este pedido es <strong>modesta</strong>. Aunque es rentable, el margen es ajustado. Se recomienda una revisión de costos o estrategia de precios.';
+            } else {
+                conclusion = '<strong>Conclusión:</strong> Este pedido <strong>no es rentable</strong> actualmente. Se requiere una reevaluación urgente de la estructura de costos y precios para evitar pérdidas.';
+            }
+
+            const modalContent = document.getElementById('summaryModalContent');
+            modalContent.innerHTML = `
+                <div class="flex justify-between items-start">
+                    <div>
+                        <h2 class="text-2xl font-bold" style="font-family: 'Orbitron', sans-serif; color:var(--accent-neon-blue)">Resumen Ejecutivo</h2>
+                        <p class="text-gray-400">Análisis de Rentabilidad para: ${productName}</p>
+                    </div>
+                    <button id="closeModalBtn" class="text-gray-400 hover:text-white transition-colors"><i data-lucide="x-circle"></i></button>
+                </div>
+                <div class="space-y-6 text-gray-300">
+                    <p class="text-base leading-relaxed">${summaryText}</p>
+                    <p class="text-base leading-relaxed p-4 bg-black/20 rounded-lg border-l-4" style="border-color: var(--accent-neon-blue);">${conclusion}</p>
+                </div>
+                <div class="flex justify-end items-center gap-4 pt-4 border-t border-gray-800">
+                    <span class="text-sm text-gray-500">Exportar como:</span>
+                    <button id="exportPdfBtn" class="flex items-center gap-2 text-sm px-3 py-1.5 rounded-md bg-red-800/50 text-red-300 hover:bg-red-800/80 transition-colors"><i data-lucide="file-text"></i>PDF</button>
+                    <button id="exportXlsxBtn" class="flex items-center gap-2 text-sm px-3 py-1.5 rounded-md bg-green-800/50 text-green-300 hover:bg-green-800/80 transition-colors"><i data-lucide="file-spreadsheet"></i>Excel</button>
+                </div>
+            `;
+            
+            lucide.createIcons();
+            document.getElementById('summaryModal').classList.add('active');
+            
+            document.getElementById('closeModalBtn').addEventListener('click', () => document.getElementById('summaryModal').classList.remove('active'));
+            document.getElementById('exportPdfBtn').addEventListener('click', exportPDF);
+            document.getElementById('exportXlsxBtn').addEventListener('click', exportXLSX);
+        }
+
+        function exportPDF() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            const d = calculatedData;
+
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(20);
+            doc.setTextColor(40, 40, 40);
+            doc.text(`Resumen de Rentabilidad: ${d.productName}`, 14, 22);
+
+            doc.setFontSize(10);
+            doc.setTextColor(100, 100, 100);
+            doc.text(`Reporte generado el: ${new Date().toLocaleDateString('es-ES')}`, 14, 28);
+            
+            const summaryData = [
+                ["Ingresos Totales", formatCurrency(d.totalSalesDOP)],
+                ["Costos Totales", formatCurrency(d.totalCostsDOP)],
+                ["Beneficio Neto Total", formatCurrency(d.totalNetProfitDOP)],
+            ];
+
+            const kpiData = [
+                ["Margen Bruto", `${formatNumber(d.totalGrossMarginPercentage)}%`],
+                ["Margen Neto", `${formatNumber(d.netMarginTotalPercentage)}%`],
+                ["Retorno de Inversión (ROI)", `${formatNumber(d.roi)}%`],
+                ["Punto de Equilibrio", `${isFinite(d.breakEvenUnits) ? formatNumber(d.breakEvenUnits) : 'N/A'} unidades`],
+            ];
+
+            const headStyles = { fillColor: [13, 110, 253], textColor: [255,255,255] };
+            const bodyStyles = { minCellHeight: 10, valign: 'middle' };
+
+            doc.autoTable({
+                startY: 40, head: [["Resumen General del Pedido", "Valor"]], body: summaryData,
+                headStyles: headStyles, bodyStyles: bodyStyles, theme: 'grid'
+            });
+            doc.autoTable({
+                startY: doc.lastAutoTable.finalY + 10, head: [["Indicadores Clave de Rentabilidad", "Valor"]], body: kpiData,
+                headStyles: headStyles, bodyStyles: bodyStyles, theme: 'grid'
+            });
+
+            doc.save(`Metrix_Resumen_${d.productName.replace(/ /g, '_')}.pdf`);
+        }
+
+        function exportXLSX() {
+            const d = calculatedData;
+            const ws_data = [
+                ["Metrix: Resumen de Rentabilidad", `Para: ${d.productName}`],
+                [],
+                ["Concepto", "Total", "Por Unidad"],
+                ["Ingresos (Venta)", d.totalSalesDOP, d.salePrice],
+                ["Costo de Producto", d.totalOrderCostDOP, d.productCostUnit],
+                ["Costo de Courier", d.courierCost, d.courierCostUnit],
+                ["Costo de Transporte", d.totalTransportCost, d.transportCostUnit],
+                ["Costo de Marketing", d.marketingCostDOP, d.marketingCostUnit],
+                ["Costo Neto Total", d.totalCostsDOP, d.netCostUnit],
+                ["Beneficio Bruto", d.totalGrossProfit, d.grossProfitUnit],
+                ["Beneficio Neto", d.totalNetProfitDOP, d.netProfitUnit],
+                [],
+                ["Indicador", "Valor"],
+                ["Margen Bruto (%)", `${formatNumber(d.totalGrossMarginPercentage)}%`],
+                ["Margen Neto (%)", `${formatNumber(d.netMarginTotalPercentage)}%`],
+                ["Retorno de Inversión (ROI)", `${formatNumber(d.roi)}%`],
+                ["Punto de Equilibrio (Unidades)", isFinite(d.breakEvenUnits) ? formatNumber(d.breakEvenUnits) : 'N/A'],
+            ];
+            const ws = XLSX.utils.aoa_to_sheet(ws_data);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Resumen");
+            XLSX.writeFile(wb, `Metrix_Resumen_${d.productName.replace(/ /g, '_')}.xlsx`);
+        }
+
+        // ===================================================================================
+        // --- BLOQUE DE INICIALIZACIÓN Y MANEJO DE EVENTOS ---
+        // ===================================================================================
+        function setupTabs() {
+            const tabs = document.querySelectorAll('.tab-button');
+            const contents = document.querySelectorAll('.tab-content');
+            tabs.forEach(tab => tab.addEventListener('click', () => { 
+                tabs.forEach(t => t.classList.remove('active')); 
+                contents.forEach(c => c.classList.remove('active')); 
+                tab.classList.add('active'); 
+                const contentId = `content-${tab.id.split('-')[1]}`;
+                const contentElement = document.getElementById(contentId);
+                if (contentElement) {
+                    contentElement.classList.add('active');
+                }
+            }));
+        }
+
+        function manageSteps(inputs) {
+            const { totalUnits, salePrice, totalOrderCostDOP } = inputs;
+            const step2 = document.getElementById('step-2'), step3 = document.getElementById('step-3');
+            const progressBar = document.getElementById('progress-bar'), progressText = document.getElementById('progress-text');
+            
+            step2.classList.add('hidden'); 
+            step3.classList.add('hidden');
+            progressBar.style.width = '0%'; 
+            progressText.textContent = 'Esperando Datos';
+
+            if (totalUnits > 0 && salePrice > 0 && productName.value) {
+                progressBar.style.width = '33%';
+                progressText.textContent = 'Paso 1 de 3';
+                step2.classList.remove('hidden');
+            }
+            if (totalUnits > 0 && salePrice > 0 && productName.value && totalOrderCostDOP > 0) {
+                progressBar.style.width = '66%';
+                progressText.textContent = 'Paso 2 de 3';
+                step3.classList.remove('hidden');
+            }
+             if (totalUnits > 0 && salePrice > 0 && productName.value && totalOrderCostDOP > 0 && targetRevenue.value) {
+                progressBar.style.width = '100%';
+                progressText.textContent = 'Análisis Completo';
+            }
+        }
+
+        function attachDynamicListeners() {
+            document.getElementById('priceVariationInput')?.addEventListener('input', calculate);
+            document.getElementById('costVariationInput')?.addEventListener('input', calculate);
+        }
+
+        // --- LÓGICA DE ANIMACIÓN (LLUVIA Y AURORA) ---
+        function setupAnimations() {
+            const canvas = document.getElementById('rain-canvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            let drops = [];
+            for (let i = 0; i < 100; i++) {
+                drops.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height,
+                    len: Math.random() * 2 + 2,
+                    speed: Math.random() * 3 + 2,
+                    opacity: Math.random() * 0.5 + 0.2
+                });
+            }
+            function drawRain() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.strokeStyle = `rgba(var(--accent-neon-blue-rgb), 0.5)`;
+                ctx.lineWidth = 1.5;
+                for (let i = 0; i < drops.length; i++) {
+                    let d = drops[i];
+                    ctx.globalAlpha = d.opacity;
+                    ctx.beginPath();
+                    ctx.moveTo(d.x, d.y);
+                    ctx.lineTo(d.x, d.y + d.len);
+                    ctx.stroke();
+                }
+                updateRain();
+            }
+            function updateRain() {
+                for (let i = 0; i < drops.length; i++) {
+                    let d = drops[i];
+                    d.y += d.speed;
+                    if (d.y > canvas.height) {
+                        d.y = -d.len;
+                        d.x = Math.random() * canvas.width;
+                    }
+                }
+            }
+            function animate() {
+                drawRain();
+                requestAnimationFrame(animate);
+            }
+            animate();
+            window.addEventListener('resize', () => {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+            });
+            document.body.addEventListener('mousemove', e => {
+                document.body.style.setProperty('--x', `${e.clientX}px`);
+                document.body.style.setProperty('--y', `${e.clientY}px`);
+            });
+        }
+
+        // --- EVENTO PRINCIPAL DE CARGA DEL DOM ---
+        document.addEventListener('DOMContentLoaded', () => {
+            setupTabs();
+            calculate();
+            setupAnimations();
+            lucide.createIcons();
+            document.querySelectorAll('#input-section input').forEach(input => input.addEventListener('input', calculate));
+            
+            const modal = document.getElementById('summaryModal');
+            document.getElementById('execSummaryBtn').addEventListener('click', generateExecutiveSummary);
+            modal.addEventListener('click', (e) => { 
+                if (e.target.id === 'summaryModal') { 
+                    modal.classList.remove('active'); 
+                } 
+            });
+
+            const toggleCheckbox = document.getElementById('toggleSalesProjections');
+            const salesSection = document.getElementById('financialProjections');
+            toggleCheckbox.addEventListener('change', () => {
+                salesSection.classList.toggle('hidden', !toggleCheckbox.checked);
+            });
+        });
+    </script>
+</body>
+</html>
