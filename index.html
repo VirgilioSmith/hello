@@ -1,422 +1,932 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard de Rentabilidad - Diseño Guiado</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <style>
-        :root {
-            --bg-color: #000000;
-            --card-color: #181818;
-            --border-color: rgba(255, 255, 255, 0.08);
-            --text-primary: #f0f0f0;
-            --text-secondary: #a0a0a0;
-            --accent-blue: #3b82f6;
-            --accent-green: #22c55e;
-            --accent-red: #ef4444;
-            --accent-amber: #f59e0b;
-            --accent-purple: #a371f7;
-        }
-        body { font-family: 'Inter', sans-serif; background-color: var(--bg-color); color: var(--text-primary); }
-        .card { background-color: var(--card-color); border-radius: 0.5rem; border: 1px solid var(--border-color); padding: 1.5rem; transition: all 0.3s ease; }
-        .input-group label { display: block; color: var(--text-secondary); font-weight: 500; font-size: 0.875rem; margin-bottom: 0.5rem; }
-        .input-group input { background-color: #0a0a0a; border: 1px solid #2a2a2a; color: var(--text-primary); padding: 0.75rem; border-radius: 0.375rem; width: 100%; }
-        .input-group input:focus { outline: none; border-color: var(--accent-blue); box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3); }
-        .metric-value { font-weight: 800; }
-        .metric-label { color: var(--text-secondary); }
-        .positive { color: var(--accent-green); }
-        .negative { color: var(--accent-red); }
-        .analysis-item { display: flex; justify-content: space-between; align-items: center; padding: 0.6rem 0; border-bottom: 1px solid var(--border-color); }
-        .analysis-item:last-child { border-bottom: none; }
-        .tab-button { padding: 0.5rem 1rem; border-radius: 0.375rem; font-weight: 600; cursor: pointer; transition: background-color 0.2s, color 0.2s; border: 1px solid transparent; }
-        .tab-button.active { background-color: var(--accent-blue); color: #fff; }
-        .tab-button:not(.active) { background-color: #21262d; color: var(--text-secondary); }
-        .tab-content { display: none; }
-        .tab-content.active { display: block; }
-        .hidden-initial { display: none; }
-        .step {
-            transition: opacity 0.5s ease-in-out, transform 0.5s ease-in-out;
-            opacity: 1;
-            transform: translateY(0);
-        }
-        .step.hidden {
-            opacity: 0;
-            transform: translateY(20px);
-            display: none;
-        }
-        .progress-bar-bg { background-color: #2a2a2a; }
-        .progress-bar { background-color: var(--accent-blue); transition: width 0.5s ease-out; }
-    </style>
-</head>
-<body class="p-4 md:p-6 lg:p-8">
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import { PiggyBank, Clock, Shield, TrendingDown, Sparkles, Wallet, Zap, HelpCircle, Building, Percent, CalendarCheck, TrendingUp, FileText, X, Download, Mail, Sun, Moon, AlertTriangle, BarChart, BookOpen, Target, CalendarX, Scale, Gauge, Wind, FastForward, Calculator, Banknote, ShieldCheck, PieChart as PieChartIcon } from 'lucide-react';
 
-    <div class="max-w-screen-xl mx-auto space-y-8">
-        <header class="text-center">
-            <h1 class="text-3xl md:text-4xl font-black tracking-tighter">Dashboard Estratégico de Rentabilidad</h1>
-            <p class="text-lg text-gray-400 mt-1">Análisis de negocio para <span id="productNameDisplay" class="font-semibold text-blue-400">Relojes Casio</span>.</p>
-        </header>
+// --- Helper Functions ---
+const formatCurrency = (value) => {
+    if (isNaN(value) || value === null) return 'RD$ 0.00';
+    return value.toLocaleString('es-DO', { style: 'currency', currency: 'DOP', minimumFractionDigits: 2 });
+};
 
-        <!-- Sección de Entradas Guiada -->
-        <div id="input-section" class="card">
-            <!-- Barra de Progreso -->
-            <div class="mb-6">
-                <div class="flex justify-between mb-1">
-                    <span class="text-base font-medium text-blue-400">Progreso de Datos</span>
-                    <span id="progress-text" class="text-sm font-medium text-blue-400">Paso 1 de 3</span>
-                </div>
-                <div class="w-full progress-bar-bg rounded-full h-2.5">
-                    <div id="progress-bar" class="progress-bar h-2.5 rounded-full" style="width: 0%"></div>
+const formatRatio = (value) => {
+    if (isNaN(value) || value === null) return 'N/A';
+    return value.toFixed(2);
+}
+
+const formatPercent = (value) => {
+    if (isNaN(value) || value === null) return 'N/A';
+    return `${(value * 100).toFixed(2)}%`;
+}
+
+const formatDate = (date) => {
+    if (!date || isNaN(date.getTime())) return 'N/A';
+    return date.toLocaleDateString('es-DO', { year: 'numeric', month: 'long', day: 'numeric' });
+};
+
+// --- Reusable Components ---
+const MetricCard = ({ title, value, icon, colorClass = 'text-amber-500 dark:text-amber-400', tooltipText, subValue }) => {
+    const valueFontSize = useMemo(() => {
+        const len = String(value).length;
+        if (len > 18) return 'text-lg sm:text-xl';
+        if (len > 12) return 'text-xl sm:text-2xl';
+        return 'text-2xl sm:text-3xl';
+    }, [value]);
+
+    return (
+        <div className="bg-white/60 dark:bg-gray-800/30 backdrop-blur-xl p-4 sm:p-5 rounded-2xl shadow-md border border-gray-200/80 dark:border-gray-700/60 transition-all duration-300 hover:shadow-xl hover:-translate-y-2 h-full relative">
+            <div className="flex items-start justify-between">
+                <div className="flex items-center overflow-hidden">
+                    <div className={`mr-3 sm:mr-4 p-2 sm:p-3 rounded-xl ${colorClass.replace('text-', 'bg-')}/10`}>
+                        {icon}
+                    </div>
+                    <div className="overflow-hidden">
+                        <div className="flex items-center">
+                            <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 truncate">{title}</p>
+                            {tooltipText && (
+                                 <div className="relative flex items-center group ml-1">
+                                    <HelpCircle size={14} className="text-gray-400 dark:text-gray-500 cursor-help flex-shrink-0" />
+                                    <div className="absolute bottom-full mb-2 w-max max-w-xs p-2 bg-gray-900 text-white text-xs rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none z-50 left-1/2 -translate-x-1/2">
+                                        {tooltipText}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                        <p className={`font-bold ${colorClass} ${valueFontSize} transition-all duration-200 truncate`}>{value}</p>
+                    </div>
                 </div>
             </div>
-            
-            <!-- Paso 1: Datos del Pedido -->
-            <div id="step-1" class="step">
-                <h2 class="text-xl font-bold mb-4">Paso 1: Datos del Pedido</h2>
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div class="input-group"><label for="productName">Producto</label><input type="text" id="productName" value="Relojes Casio"></div>
-                    <div class="input-group"><label for="totalUnits">Unidades</label><input type="number" id="totalUnits" value="8" placeholder="Ej: 8"></div>
-                    <div class="input-group"><label for="salePrice">Precio Venta (DOP)</label><input type="number" id="salePrice" value="2000" placeholder="Ej: 2500"></div>
-                </div>
-            </div>
-            
-            <!-- Paso 2: Gastos del Pedido -->
-            <div id="step-2" class="step hidden">
-                 <h2 class="text-xl font-bold mt-6 mb-4">Paso 2: Gastos del Pedido</h2>
-                <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
-                    <div class="input-group"><label for="totalOrderCostDOP">Costo Total Pedido (DOP)</label><input type="number" id="totalOrderCostDOP" value="5190" placeholder="Ej: 9950.40"></div>
-                    <div class="input-group"><label for="courierCost">Courier (DOP)</label><input type="number" id="courierCost" value="1000" placeholder="Ej: 574.14"></div>
-                    <div class="input-group"><label for="transportCost">Transporte (DOP)</label><input type="number" id="transportCost" value="0" placeholder="Ej: 70"></div>
-                    <div class="input-group"><label for="marketingPercentage">Inversión Marketing (%)</label><input type="number" id="marketingPercentage" value="4" placeholder="Ej: 10"></div>
-                </div>
-            </div>
+             {subValue && <span className="absolute top-3 right-3 text-xs font-semibold text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700/50 px-2 py-1 rounded-full">{subValue}</span>}
+        </div>
+    );
+};
 
-            <!-- Paso 3: Meta de Proyección -->
-            <div id="step-3" class="step hidden">
-                <h2 class="text-xl font-bold mt-6 mb-4">Paso 3: Meta y Simulación</h2>
-                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div class="input-group"><label for="targetRevenue">Meta de Ingresos (DOP)</label><input type="number" id="targetRevenue" value="500000" placeholder="Ej: 500000"></div>
+
+const InputField = ({ label, id, value, onChange, placeholder }) => (
+    <div>
+        <label htmlFor={id} className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">{label}</label>
+        <input
+            type="text"
+            id={id}
+            value={value}
+            onChange={onChange}
+            placeholder={placeholder}
+            className="w-full p-3 bg-white/50 dark:bg-gray-900/50 border border-gray-300/70 dark:border-gray-700/60 rounded-xl shadow-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-all duration-300 text-gray-800 dark:text-white"
+        />
+    </div>
+);
+
+const ToggleSwitch = ({ label, checked, onChange }) => (
+    <label className="flex items-center cursor-pointer">
+        <div className="relative">
+            <input type="checkbox" className="sr-only" checked={checked} onChange={onChange} />
+            <div className={`block w-14 h-8 rounded-full transition-colors ${checked ? 'bg-amber-500' : 'bg-gray-300 dark:bg-gray-700'}`}></div>
+            <div className={`dot absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition-transform shadow-md ${checked ? 'transform translate-x-6' : ''}`}></div>
+        </div>
+        <div className="ml-3 text-gray-700 dark:text-gray-300 font-medium">{label}</div>
+    </label>
+);
+
+const AnimatedSection = ({ children, delay = 0 }) => {
+    const [isVisible, setIsVisible] = useState(false);
+    
+    useEffect(() => {
+        const timer = setTimeout(() => setIsVisible(true), delay);
+        return () => clearTimeout(timer);
+    }, [delay]);
+
+    return (
+        <div className={`transition-all duration-700 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5'}`}>
+            {children}
+        </div>
+    );
+};
+
+
+const PieChart = ({ data, title }) => {
+    const [hoveredSlice, setHoveredSlice] = useState(null);
+    const total = data.reduce((acc, item) => acc + item.value, 0);
+    if (total === 0) return null;
+
+    const pieRadius = 0.8;
+    const labelRadius = 1.1;
+    let cumulativePercent = 0;
+
+    const slices = data.map(item => {
+        const percent = item.value / total;
+        const startAngle = cumulativePercent * 2 * Math.PI;
+        cumulativePercent += percent;
+        const endAngle = cumulativePercent * 2 * Math.PI;
+        const midAngle = startAngle + (endAngle - startAngle) / 2;
+
+        const x1 = Math.cos(startAngle) * pieRadius;
+        const y1 = Math.sin(startAngle) * pieRadius;
+        const x2 = Math.cos(endAngle) * pieRadius;
+        const y2 = Math.sin(endAngle) * pieRadius;
+        const largeArcFlag = percent > 0.5 ? 1 : 0;
+
+        const pathData = `M ${x1} ${y1} A ${pieRadius} ${pieRadius} 0 ${largeArcFlag} 1 ${x2} ${y2} L 0 0 Z`;
+
+        const labelX = Math.cos(midAngle) * labelRadius;
+        const labelY = Math.sin(midAngle) * labelRadius;
+        
+        const lineStartX = Math.cos(midAngle) * (pieRadius + 0.05);
+        const lineStartY = Math.sin(midAngle) * (pieRadius + 0.05);
+        const lineEndX = Math.cos(midAngle) * (labelRadius - 0.1);
+        const lineEndY = Math.sin(midAngle) * (labelRadius - 0.1);
+
+        return {
+            ...item,
+            path: pathData,
+            percent: (percent * 100),
+            labelPos: { x: labelX, y: labelY },
+            linePoints: { x1: lineStartX, y1: lineStartY, x2: lineEndX, y2: lineEndY },
+            textAnchor: (midAngle > Math.PI / 2 && midAngle < 1.5 * Math.PI) ? 'end' : 'start'
+        };
+    });
+
+    return (
+        <div className="bg-white/60 dark:bg-gray-800/30 backdrop-blur-xl p-6 rounded-2xl shadow-md border border-gray-200/80 dark:border-gray-700/60 flex flex-col items-center h-full transition-all duration-300 hover:shadow-xl">
+            <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200 mb-4">{title}</h3>
+            <div className="w-full h-80 md:h-96">
+                <svg width="100%" height="100%" viewBox="-1.5 -1.5 3 3" style={{ transform: 'rotate(-90deg)' }}>
+                    <g>
+                        {slices.map((slice, i) => (
+                            <g key={i} onMouseEnter={() => setHoveredSlice(slice)} onMouseLeave={() => setHoveredSlice(null)}>
+                                <path 
+                                    d={slice.path} 
+                                    fill={slice.color} 
+                                    className="transition-all duration-300"
+                                    style={{ 
+                                        opacity: hoveredSlice && hoveredSlice.name !== slice.name ? 0.3 : 1,
+                                        transform: hoveredSlice && hoveredSlice.name === slice.name ? 'scale(1.05)' : 'scale(1)',
+                                        transformOrigin: 'center'
+                                    }}
+                                />
+                            </g>
+                        ))}
+                    </g>
+                    <g style={{ transform: 'rotate(90deg)' }}>
+                        {slices.map((slice, i) => (
+                             <g key={`label-${i}`} style={{ opacity: hoveredSlice && hoveredSlice.name !== slice.name ? 0.3 : 1 }} className="transition-opacity duration-300">
+                                <line 
+                                    x1={slice.linePoints.x1} y1={slice.linePoints.y1}
+                                    x2={slice.linePoints.x2} y2={slice.linePoints.y2}
+                                    stroke={slice.color} strokeWidth="0.02"
+                                />
+                                <text 
+                                    x={slice.labelPos.x} y={slice.labelPos.y} 
+                                    textAnchor={slice.textAnchor} 
+                                    alignmentBaseline="middle" 
+                                    className="fill-gray-700 dark:fill-gray-200"
+                                    style={{ fontSize: '0.1px', fontWeight: 'bold' }}>
+                                    {`${slice.percent.toFixed(1)}%`}
+                                </text>
+                                <text 
+                                    x={slice.labelPos.x} y={slice.labelPos.y + 0.1} 
+                                    textAnchor={slice.textAnchor} 
+                                    alignmentBaseline="middle" 
+                                    className="fill-gray-500 dark:fill-gray-400"
+                                    style={{ fontSize: '0.08px' }}>
+                                    {slice.name}
+                                </text>
+                            </g>
+                        ))}
+                    </g>
+                </svg>
+            </div>
+        </div>
+    );
+};
+
+
+const AmortizationTable = ({ schedule, isFixedAbono, fixedAbonoAmount, onAbonoChange, abonos, insuranceAmount, amount, isAnnualView, setIsAnnualView }) => {
+    const annualSchedule = useMemo(() => {
+        if (!isAnnualView) return [];
+        const years = {};
+        schedule.forEach(row => {
+            const year = Math.ceil(row.month / 12);
+            if (!years[year]) {
+                years[year] = {
+                    year: year,
+                    startBalance: schedule.find(r => Math.ceil(r.month / 12) === year)?.startBalance ?? amount,
+                    principal: 0,
+                    interest: 0,
+                    extra: 0,
+                    insurance: 0,
+                    endBalance: 0,
+                };
+            }
+            years[year].principal += row.principal;
+            years[year].interest += row.interest;
+            years[year].extra += row.extra;
+            years[year].insurance += insuranceAmount;
+            years[year].endBalance = row.balance;
+            years[year].startBalance = schedule.find(r => r.month === (year - 1) * 12)?.balance ?? amount;
+        });
+
+        const result = Object.values(years);
+        if (result.length > 0) {
+            result[0].startBalance = amount;
+        }
+        return result;
+    }, [isAnnualView, schedule, amount, insuranceAmount]);
+
+    const totals = useMemo(() => {
+        return {
+            principal: schedule.reduce((acc, row) => acc + row.principal, 0),
+            interest: schedule.reduce((acc, row) => acc + row.interest, 0),
+            insurance: schedule.length * insuranceAmount,
+            extra: schedule.reduce((acc, row) => acc + row.extra, 0),
+        }
+    }, [schedule, insuranceAmount]);
+
+    return (
+        <div className="bg-white/60 dark:bg-gray-800/30 backdrop-blur-xl rounded-2xl shadow-md border border-gray-200/80 dark:border-gray-700/60 mt-8">
+            <div className="p-4 flex justify-between items-center">
+                 <h2 className="text-lg font-bold text-gray-800 dark:text-gray-200">
+                    Tabla de Amortización
+                 </h2>
+                 <div className="bg-gray-200 dark:bg-gray-900/50 p-1 rounded-lg flex items-center">
+                    <button
+                        onClick={() => setIsAnnualView(false)}
+                        className={`px-3 py-1 text-sm font-semibold rounded-md transition-colors ${!isAnnualView ? 'bg-white dark:bg-gray-700 shadow text-gray-800 dark:text-gray-200' : 'text-gray-500 dark:text-gray-400'}`}
+                    >
+                        Mensual
+                    </button>
+                    <button
+                        onClick={() => setIsAnnualView(true)}
+                        className={`px-3 py-1 text-sm font-semibold rounded-md transition-colors ${isAnnualView ? 'bg-white dark:bg-gray-700 shadow text-gray-800 dark:text-gray-200' : 'text-gray-500 dark:text-gray-400'}`}
+                    >
+                        Anual
+                    </button>
                  </div>
             </div>
-        </div>
-
-        <!-- Sección de Resultados (Oculta por defecto) -->
-        <div id="results-section" class="hidden-initial space-y-6">
-             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
-                <div class="card"><div class="flex items-center gap-4"><div class="p-3 rounded-full bg-blue-500/20 text-blue-400"><i data-lucide="wallet"></i></div><div><p id="totalSalesDOP" class="metric-value text-2xl">DOP 0,00</p><p class="metric-label">Ventas (Pedido)</p></div></div></div>
-                <div class="card"><div class="flex items-center gap-4"><div class="p-3 rounded-full bg-red-500/20 text-red-400"><i data-lucide="receipt"></i></div><div><p id="totalCostsDOP" class="metric-value text-2xl">DOP 0,00</p><p class="metric-label">Costos (Pedido)</p></div></div></div>
-                <div class="card"><div class="flex items-center gap-4"><div class="p-3 rounded-full bg-green-500/20 text-green-400"><i data-lucide="piggy-bank"></i></div><div><p id="totalNetProfitDOP" class="metric-value text-2xl">DOP 0,00</p><p class="metric-label">Ganancia Neta</p></div></div></div>
-                <div class="card"><div class="flex items-center gap-4"><div class="p-3 rounded-full bg-blue-500/20 text-blue-400"><i data-lucide="pie-chart"></i></div><div><p id="totalGrossMargin" class="metric-value text-2xl">0,00%</p><p class="metric-label">Margen Bruto</p></div></div></div>
-                <div class="card"><div class="flex items-center gap-4"><div class="p-3 rounded-full bg-green-500/20 text-green-400"><i data-lucide="trending-up"></i></div><div><p id="totalNetMargin" class="metric-value text-2xl">0,00%</p><p class="metric-label">Margen Neto</p></div></div></div>
+            <div className="overflow-x-auto max-h-[600px]">
+                {isAnnualView ? (
+                    <table className="min-w-full">
+                        <thead className="sticky top-0 bg-gray-50/80 dark:bg-gray-900/80 backdrop-blur-sm z-10">
+                            <tr>
+                                {['Año', 'Saldo Inicial', 'Capital', 'Interés', 'Seguro', 'Abono Extra', 'Saldo Final'].map(h => (
+                                    <th key={h} className="px-4 py-3 text-xs font-medium uppercase tracking-wider text-center text-gray-500 dark:text-gray-400">{h}</th>
+                                ))}
+                            </tr>
+                        </thead>
+                        <tbody className="bg-white/50 dark:bg-gray-800/50 divide-y divide-gray-200/80 dark:divide-gray-700/60">
+                            {annualSchedule.map((row) => (
+                                <tr key={row.year} className="hover:bg-gray-50/50 dark:hover:bg-gray-700/50">
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-800 dark:text-gray-200 text-center">{row.year}</td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300 text-right">{formatCurrency(row.startBalance)}</td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-green-600 dark:text-green-400 text-right">{formatCurrency(row.principal)}</td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-rose-600 dark:text-rose-400 text-right">{formatCurrency(row.interest)}</td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 text-right">{formatCurrency(row.insurance)}</td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-sky-600 dark:text-sky-400 text-right">{formatCurrency(row.extra)}</td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm font-bold text-gray-800 dark:text-gray-200 text-right">{formatCurrency(row.endBalance)}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                        <tfoot className="bg-gray-100/80 dark:bg-gray-900/80 backdrop-blur-sm font-bold sticky bottom-0 z-20">
+                            <tr>
+                                <td colSpan="2" className="px-4 py-3 text-right text-gray-700 dark:text-gray-300">Totales:</td>
+                                <td className="px-4 py-3 text-right text-green-700 dark:text-green-400">{formatCurrency(totals.principal)}</td>
+                                <td className="px-4 py-3 text-right text-rose-700 dark:text-rose-400">{formatCurrency(totals.interest)}</td>
+                                <td className="px-4 py-3 text-right text-gray-600 dark:text-gray-400">{formatCurrency(totals.insurance)}</td>
+                                <td className="px-4 py-3 text-right text-sky-700 dark:text-sky-400">{formatCurrency(totals.extra)}</td>
+                                <td className="px-4 py-3"></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                ) : (
+                    <table className="min-w-full">
+                        <thead className="sticky top-0 bg-gray-50/80 dark:bg-gray-900/80 backdrop-blur-sm z-10">
+                            <tr>
+                                {['Mes', 'Saldo Inicial', 'Capital', 'Interés', 'Seguro', 'Pago Regular', 'Abono Extra', 'Saldo Final'].map(h => (
+                                    <th key={h} className="px-4 py-3 text-xs font-medium uppercase tracking-wider text-center text-gray-500 dark:text-gray-400">{h}</th>
+                                ))}
+                            </tr>
+                        </thead>
+                        <tbody className="bg-white/50 dark:bg-gray-800/50 divide-y divide-gray-200/80 dark:divide-gray-700/60">
+                            {schedule.map((row, index) => (
+                                <tr key={row.month} className="hover:bg-gray-50/50 dark:hover:bg-gray-700/50">
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-800 dark:text-gray-200 text-center">{row.month}</td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300 text-right">{formatCurrency(row.startBalance)}</td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-green-600 dark:text-green-400 text-right">{formatCurrency(row.principal)}</td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-rose-600 dark:text-rose-400 text-right">{formatCurrency(row.interest)}</td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 text-right">{formatCurrency(insuranceAmount)}</td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 text-right">{formatCurrency(row.payment + insuranceAmount)}</td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-center">
+                                        <input
+                                            type="text"
+                                            value={isFixedAbono ? fixedAbonoAmount : (abonos[index] || '')}
+                                            onChange={(e) => onAbonoChange(index, e.target.value)}
+                                            disabled={isFixedAbono}
+                                            className="w-28 p-1 text-right border bg-white/50 dark:bg-gray-900/50 border-gray-300/70 dark:border-gray-600/70 rounded-md shadow-sm disabled:bg-gray-200 dark:disabled:bg-gray-800 disabled:cursor-not-allowed text-gray-800 dark:text-white"
+                                        />
+                                    </td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm font-bold text-gray-800 dark:text-gray-200 text-right">{formatCurrency(row.balance)}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                         <tfoot className="bg-gray-100/80 dark:bg-gray-900/80 backdrop-blur-sm font-bold sticky bottom-0 z-20">
+                            <tr>
+                                <td colSpan="2" className="px-4 py-3 text-right text-gray-700 dark:text-gray-300">Totales:</td>
+                                <td className="px-4 py-3 text-right text-green-700 dark:text-green-400">{formatCurrency(totals.principal)}</td>
+                                <td className="px-4 py-3 text-right text-rose-700 dark:text-rose-400">{formatCurrency(totals.interest)}</td>
+                                <td className="px-4 py-3 text-right text-gray-600 dark:text-gray-400">{formatCurrency(totals.insurance)}</td>
+                                <td className="px-4 py-3"></td>
+                                <td className="px-4 py-3 text-right text-sky-700 dark:text-sky-400">{formatCurrency(totals.extra)}</td>
+                                <td className="px-4 py-3"></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                )}
             </div>
-
-            <div class="card">
-                <div class="flex space-x-2 border-b border-gray-700 mb-4">
-                    <button id="tab-financial" class="tab-button active">Análisis Financiero</button>
-                    <button id="tab-projections" class="tab-button">Proyecciones y Simulación</button>
-                </div>
-                <div id="content-financial" class="tab-content active">
-                    <div class="grid grid-cols-1 md:grid-cols-5 gap-8">
-                        <div class="md:col-span-3" id="unitAnalysis"></div>
-                        <div class="md:col-span-2 border-t md:border-t-0 md:border-l border-gray-700 md:pl-8 pt-4 md:pt-0" id="generalAnalysis"></div>
-                        <div class="md:col-span-5 mt-8" id="financialProjections"></div>
-                        
-                        <!-- Header for Sales Projections with Toggle Button -->
-                        <div class="md:col-span-5 mt-8 flex justify-between items-center border-b border-gray-700 pb-2">
-                            <div>
-                                <h3 class="font-bold text-gray-300 text-xl">Estimaciones de Ventas</h3>
-                                <p class="text-sm text-gray-500">Basado en el pedido actual como ventas de 1 semana.</p>
-                            </div>
-                            <button id="toggleSalesProjections" class="bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg flex items-center gap-2 transition-all text-sm">
-                                <i data-lucide="eye-off"></i>
-                                <span>Ocultar</span>
-                            </button>
-                        </div>
-
-                        <div class="md:col-span-5" id="salesProjections"></div>
-                    </div>
-                </div>
-                <div id="content-projections" class="tab-content">
-                     <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                        <div id="revenueProjectionPlan"></div>
-                        <div id="riskAnalysis" class="border-t md:border-t-0 md:border-l border-gray-700 md:pl-8 pt-4 md:pt-0"></div>
-                     </div>
-                </div>
-            </div>
         </div>
-    </div>
+    );
+};
 
-    <script>
-        function setupTabs() {
-            const tabs = document.querySelectorAll('.tab-button');
-            const contents = document.querySelectorAll('.tab-content');
-            tabs.forEach(tab => {
-                tab.addEventListener('click', () => {
-                    tabs.forEach(t => t.classList.remove('active'));
-                    contents.forEach(c => c.classList.remove('active'));
-                    tab.classList.add('active');
-                    document.getElementById(`content-${tab.id.split('-')[1]}`).classList.add('active');
-                });
-            });
-        }
+const FormattedSummary = ({ text }) => {
+    return (
+        <div className="text-gray-700 dark:text-gray-300 font-sans text-sm leading-relaxed">
+            {text.split('\n').map((line, i) => {
+                if (line.trim() === '') return <div key={i} className="h-4" />;
 
-        const formatCurrency = (value) => new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'DOP', minimumFractionDigits: 2 }).format(isNaN(value) || !isFinite(value) ? 0 : value);
-        const formatNumber = (value, digits = 0) => new Intl.NumberFormat('es-ES', { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(isNaN(value) || !isFinite(value) ? 0 : value);
+                const parts = line.split(/(\*\*.*?\*\*)/g).filter(Boolean);
+
+                return (
+                    <p key={i} className={line.trim().startsWith('•') ? 'ml-4' : ''}>
+                        {parts.map((part, j) => {
+                            if (part.startsWith('**') && part.endsWith('**')) {
+                                return <strong key={j} className="text-gray-900 dark:text-white uppercase">{part.slice(2, -2)}</strong>;
+                            }
+                            return part;
+                        })}
+                    </p>
+                );
+            })}
+        </div>
+    );
+};
+
+const SummaryModal = ({ isOpen, onClose, summaryText, onSendEmail, calculationResults }) => {
+    if (!isOpen) return null;
+
+    const exportToPdf = () => {
+        if (!window.jspdf || !calculationResults) return;
         
-        function manageSteps() {
-            const totalUnits = parseInt(document.getElementById('totalUnits').value) || 0;
-            const salePrice = parseFloat(document.getElementById('salePrice').value) || 0;
-            const totalOrderCostDOP = parseFloat(document.getElementById('totalOrderCostDOP').value) || 0;
+        const { original, withAbonos, inputs, kpis } = calculationResults;
+        
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF('p', 'mm', 'a4');
+        const margin = 15;
+        const pageWidth = doc.internal.pageSize.getWidth();
+        let yPos = 20;
 
-            const step2 = document.getElementById('step-2');
-            const step3 = document.getElementById('step-3');
-            const progressBar = document.getElementById('progress-bar');
-            const progressText = document.getElementById('progress-text');
+        const addTitle = (text) => {
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(16);
+            doc.text(text, pageWidth / 2, yPos, { align: 'center' });
+            yPos += 8;
+        };
 
-            step2.classList.add('hidden');
-            step3.classList.add('hidden');
-            progressBar.style.width = '33%';
-            progressText.textContent = 'Paso 1 de 3';
-
-            if (totalUnits > 0 && salePrice > 0) {
-                step2.classList.remove('hidden');
-                progressBar.style.width = '66%';
-                progressText.textContent = 'Paso 2 de 3';
-            }
-
-            if (totalUnits > 0 && salePrice > 0 && totalOrderCostDOP > 0) {
-                step3.classList.remove('hidden');
-                progressBar.style.width = '100%';
-                progressText.textContent = 'Paso 3 de 3 - ¡Listo!';
-            }
+        const addSubTitle = (text) => {
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(12);
+            doc.text(text, margin, yPos);
+            yPos += 6;
+        };
+        
+        const addText = (text, indent = 0) => {
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(10);
+            const splitText = doc.splitTextToSize(text, pageWidth - (margin * 2) - indent);
+            doc.text(splitText, margin + indent, yPos);
+            yPos += (splitText.length * 5);
+        };
+        
+        const addBullet = (text) => {
+            addText(`• ${text}`, 5);
         }
+        
+        const termInYears = Math.floor(inputs.term / 12);
+        const remainingMonths = inputs.term % 12;
+        const termString = `${inputs.term} meses (${termInYears > 0 ? `${termInYears} año(s)` : ''} ${remainingMonths > 0 ? `${remainingMonths} mes(es)`: ''})`.trim();
 
-        function calculate() {
-            manageSteps();
 
-            const totalUnits = parseInt(document.getElementById('totalUnits').value) || 0;
-            const salePrice = parseFloat(document.getElementById('salePrice').value) || 0;
-            const totalOrderCostDOP = parseFloat(document.getElementById('totalOrderCostDOP').value) || 0;
-            const courierCost = parseFloat(document.getElementById('courierCost').value) || 0;
-            const transportCost = parseFloat(document.getElementById('transportCost').value) || 0;
-            const marketingPercentage = parseFloat(document.getElementById('marketingPercentage').value) || 0;
-            const targetRevenue = parseFloat(document.getElementById('targetRevenue').value) || 0;
-            document.getElementById('productNameDisplay').textContent = document.getElementById('productName').value || 'Producto';
-            
-            const resultsSection = document.getElementById('results-section');
+        addTitle('ANÁLISIS FINANCIERO DE PRÉSTAMO');
+        addText(`Fecha de Emisión: ${formatDate(new Date())}`);
+        yPos += 5;
 
-            if (totalUnits > 0 && salePrice > 0 && totalOrderCostDOP > 0) {
-                resultsSection.style.display = 'block';
-            } else {
-                resultsSection.style.display = 'none';
-                return; 
-            }
+        addText(`Este informe detalla el análisis de un préstamo de ${formatCurrency(inputs.amount)} a un plazo de ${termString} con una tasa de interés anual del ${inputs.interest}%. Se compara el plan de pago estándar con una estrategia de pagos acelerados para evaluar los beneficios financieros.`);
+        yPos += 5;
 
-            const priceVariation = parseFloat(document.getElementById('priceVariationInput')?.value) || 0;
-            const costVariation = parseFloat(document.getElementById('costVariationInput')?.value) || 0;
+        addSubTitle('ESCENARIO 1: PLAN DE PAGO ORIGINAL');
+        addText(`Bajo el esquema de pago estándar, el préstamo se liquidaría el ${formatDate(original.payoffDate)}. El costo total ascendería a ${formatCurrency(original.totalPaid)}, desglosado en ${formatCurrency(inputs.amount)} de capital, ${formatCurrency(original.totalInterest)} en intereses y ${formatCurrency(original.totalInsurance)} en costos de seguro. La cuota mensual (capital + interés + seguro) sería de ${formatCurrency(original.monthlyPayment + inputs.insurance)}.`, 5);
+        yPos += 5;
 
-            const totalSalesDOP = totalUnits * salePrice;
-            const marketingCostDOP = totalSalesDOP * (marketingPercentage / 100);
-            const totalCostsDOP = totalOrderCostDOP + courierCost + transportCost + marketingCostDOP;
-            const totalNetProfitDOP = totalSalesDOP - totalCostsDOP;
+        addSubTitle('ESCENARIO 2: PLAN DE PAGO ACELERADO');
+        addText(`Al implementar una estrategia de abonos por un total de ${formatCurrency(withAbonos.totalAbonosPaid)}, el panorama financiero mejora sustancialmente. El costo total del préstamo se reduce a ${formatCurrency(withAbonos.totalPaid)}, y la fecha de liquidación se adelanta al ${formatDate(withAbonos.payoffDate)}.`, 5);
+        yPos += 5;
 
-            const productCostUnit = totalUnits > 0 ? totalOrderCostDOP / totalUnits : 0;
-            const courierCostUnit = totalUnits > 0 ? courierCost / totalUnits : 0;
-            const transportCostUnit = totalUnits > 0 ? transportCost / totalUnits : 0;
-            const marketingCostUnit = totalUnits > 0 ? marketingCostDOP / totalUnits : 0;
-            const netCostUnit = productCostUnit + courierCostUnit + transportCostUnit + marketingCostUnit;
-            const netProfitUnit = salePrice - netCostUnit;
+        addSubTitle('ANÁLISIS DE AHORRO Y EFICIENCIA');
+        addText(`La estrategia de abonos genera un AHORRO TOTAL de ${formatCurrency(kpis.totalSavings)}, reduciendo el plazo del préstamo en ${kpis.monthsSaved} meses.`);
+        yPos += 5;
 
-            const grossProfitUnit = salePrice - productCostUnit;
-            const grossMarginUnitPercentage = salePrice > 0 ? (grossProfitUnit / salePrice) * 100 : 0;
-            const totalGrossProfit = totalSalesDOP - totalOrderCostDOP;
-            const totalGrossMarginPercentage = totalSalesDOP > 0 ? (totalGrossProfit / totalSalesDOP) * 100 : 0;
+        addSubTitle('INDICADORES CLAVE DE RENDIMIENTO (KPIs)');
+        addBullet(`Poder del Abono: Cada ${formatCurrency(1)} abonado genera un ahorro de ${formatCurrency(kpis.abonoPower)} en intereses.`);
+        addBullet(`Tasa de Amortización: El préstamo se liquida ${formatRatio(kpis.amortizationRate)} veces más rápido.`);
+        addBullet(`Punto de Inflexión: Se adelanta del mes ${original.inflectionPoint} al mes ${withAbonos.inflectionPoint}.`);
+        yPos += 5;
 
-            const netMarginUnitPercentage = salePrice > 0 ? (netProfitUnit / salePrice) * 100 : 0;
-            const returnOnCost = netCostUnit > 0 ? (netProfitUnit / netCostUnit) * 100 : 0;
-            const netMarginTotalPercentage = totalSalesDOP > 0 ? (totalNetProfitDOP / totalSalesDOP) * 100 : 0;
-            const marketingCostPerSaleAsFraction = (marketingPercentage / 100);
-            const romi = marketingCostDOP > 0 ? (totalNetProfitDOP / marketingCostDOP) * 100 : 0;
-            
-            const fixedCosts = courierCost + transportCost;
-            const contributionMargin = salePrice - productCostUnit - marketingCostUnit;
-            const breakEvenUnits = contributionMargin > 0 ? fixedCosts / contributionMargin : Infinity;
+        addSubTitle('ESTRATEGIAS Y RECOMENDACIONES');
+        addBullet(`Disciplina en Abonos: Mantener la consistencia en los abonos es clave para maximizar el ahorro.`);
+        addBullet(`Abonos Extraordinarios: Considere destinar ingresos no recurrentes para acelerar aún más el pago.`);
+        addBullet(`Revisión de Tasa: Evalúe periódicamente la posibilidad de renegociar la tasa de interés.`);
+        yPos += 5;
+        
+        addSubTitle('CONCLUSIÓN');
+        addText('La estrategia de pagos acelerados demuestra ser altamente efectiva, generando un ahorro sustancial y reduciendo el tiempo de endeudamiento.');
 
-            const unitsForTargetRevenue = salePrice > 0 ? targetRevenue / salePrice : 0;
-            const projectedProductCost = productCostUnit * unitsForTargetRevenue;
-            const projectedCourierCost = courierCostUnit * unitsForTargetRevenue;
-            const projectedMarketingCost = targetRevenue * marketingCostPerSaleAsFraction;
-            const projectedTotalCost = projectedProductCost + projectedCourierCost + transportCost + projectedMarketingCost;
-            const projectedNetProfit = targetRevenue - projectedTotalCost;
+        doc.save('Resumen_Ejecutivo_Prestamo.pdf');
+    };
 
-            const simulatedSalePrice = salePrice * (1 + priceVariation / 100);
-            const simulatedProductCostUnit = productCostUnit * (1 + costVariation / 100);
-            const unitsForSimulatedRevenue = simulatedSalePrice > 0 ? targetRevenue / simulatedSalePrice : 0;
-            const simulatedVariableProfitPerUnit = simulatedSalePrice - simulatedProductCostUnit - courierCostUnit - (simulatedSalePrice * marketingCostPerSaleAsFraction);
-            const simulatedProjectedProfit = (simulatedVariableProfitPerUnit * unitsForSimulatedRevenue) - transportCost;
-            
-            const simulatedProjectedProductCost = simulatedProductCostUnit * unitsForSimulatedRevenue;
-            const simulatedProjectedCourierCost = courierCostUnit * unitsForSimulatedRevenue;
-            const simulatedProjectedMarketingCost = targetRevenue * marketingCostPerSaleAsFraction;
-            const simulatedProjectedTotalCost = simulatedProjectedProductCost + simulatedProjectedCourierCost + transportCost + simulatedProjectedMarketingCost;
-
-            document.getElementById('totalSalesDOP').textContent = formatCurrency(totalSalesDOP);
-            document.getElementById('totalCostsDOP').textContent = formatCurrency(totalCostsDOP);
-            document.getElementById('totalNetProfitDOP').textContent = formatCurrency(totalNetProfitDOP);
-            document.getElementById('totalNetProfitDOP').className = `metric-value text-2xl ${totalNetProfitDOP >= 0 ? 'positive' : 'negative'}`;
-            document.getElementById('totalGrossMargin').textContent = `${formatNumber(totalGrossMarginPercentage, 2)}%`;
-            document.getElementById('totalNetMargin').textContent = `${formatNumber(netMarginTotalPercentage, 2)}%`;
-
-            const createAnalysisItem = (label, value, valueClass = 'text-gray-200', isSub = false) => `<div class="analysis-item ${isSub ? 'pl-4' : ''}"><p class="text-gray-400">${label}</p><p class="font-bold ${isSub ? 'text-base' : 'text-lg'} ${valueClass}">${value}</p></div>`;
-            
-            document.getElementById('unitAnalysis').innerHTML = `<h3 class="font-bold text-gray-300 mb-2">Análisis por Unidad</h3>` + createAnalysisItem('Precio de Venta', formatCurrency(salePrice), 'text-blue-400') + createAnalysisItem('Costo Neto', formatCurrency(netCostUnit), 'text-amber-400') + createAnalysisItem('C. Producto', formatCurrency(productCostUnit), 'text-gray-200', true) + createAnalysisItem('C. Courier', formatCurrency(courierCostUnit), 'text-gray-200', true) + createAnalysisItem('C. Transporte', formatCurrency(transportCostUnit), 'text-gray-200', true) + createAnalysisItem('C. Marketing', formatCurrency(marketingCostUnit), 'text-gray-200', true) + createAnalysisItem('Ganancia Neta', formatCurrency(netProfitUnit), netProfitUnit >= 0 ? 'positive' : 'negative') + `<hr class="my-2 border-gray-700">` + createAnalysisItem('Margen Bruto (%)', `${formatNumber(grossMarginUnitPercentage, 2)}%`, 'text-blue-400') + createAnalysisItem('Margen Neto (%)', `${formatNumber(netMarginUnitPercentage, 2)}%`, 'text-green-400');
-            
-            document.getElementById('generalAnalysis').innerHTML = `<h3 class="font-bold text-gray-300 mb-2">Métricas Generales (Pedido)</h3>` + createAnalysisItem('Ganancia Bruta Total', formatCurrency(totalGrossProfit), 'text-blue-400') + createAnalysisItem('Ganancia Neta Total', formatCurrency(totalNetProfitDOP), 'text-green-400') + `<hr class="my-2 border-gray-700">` + createAnalysisItem('Retorno sobre Costo', `${formatNumber(returnOnCost, 2)}%`, 'text-green-400') + createAnalysisItem('Punto de Equilibrio', `${isFinite(breakEvenUnits) ? formatNumber(breakEvenUnits, 2) : 'N/A'} unidades`, 'text-amber-400') + createAnalysisItem('ROMI (%)', `${formatNumber(romi, 2)}%`, romi >= 0 ? 'text-purple-400' : 'text-red-400');
-            
-            const paces = [
-                { label: 'en 7 días', days: 7 },
-                { label: 'en 1 mes', days: 30 },
-                { label: 'en 3 meses', days: 90 },
-                { label: 'en 6 meses', days: 180 },
-                { label: 'en 9 meses', days: 270 },
-                { label: 'en 1 año', days: 365 }
-            ];
-            let financialProjectionsHTML = `<h3 class="font-bold text-gray-300 mb-2">Proyecciones de Análisis Financiero</h3><p class="text-sm text-gray-500 mb-4">Ritmo de venta diario necesario para vender las <span class="font-bold text-white">${totalUnits}</span> unidades del pedido inicial en diferentes plazos.</p>`;
-            financialProjectionsHTML += `<div class="bg-gray-800/50 p-4 rounded-lg grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4">`;
-            paces.forEach(pace => {
-                financialProjectionsHTML += `<div class="text-center">
-                    <p class="text-sm text-gray-400">${pace.label}</p>
-                    <p class="text-xl font-bold text-purple-400">${formatNumber(totalUnits / pace.days, 2)}</p>
-                    <p class="text-xs text-gray-500">Unidades/Día</p>
-                </div>`;
-            });
-            financialProjectionsHTML += `</div>`;
-            document.getElementById('financialProjections').innerHTML = financialProjectionsHTML;
-
-            const createPacingHTML = (totalUnits) => {
-                let html = `<div class="mt-3 pt-3 border-t border-gray-700/50"><p class="text-xs text-gray-400 mb-1 text-center">Ritmo de Venta Diario para ${formatNumber(totalUnits)} Unidades</p><div class="grid grid-cols-2 gap-x-4">`;
-                paces.forEach(pace => {
-                    html += `<p class="text-xs text-gray-500">${pace.label}: <span class="font-bold text-purple-400">${formatNumber(totalUnits / pace.days, 2)}</span></p>`;
-                });
-                html += `</div></div>`;
-                return html;
-            };
-
-            const baseDailyUnits = totalUnits / 7;
-            const projections = [
-                { period: '7 Días', days: 7 },
-                { period: '1 Mes', days: 30 },
-                { period: '3 Meses', days: 90 },
-                { period: '1 Año', days: 365 }
-            ];
-
-            let projectionsHTML = `<div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4">`;
-            projections.forEach(p => {
-                const pUnits = baseDailyUnits * p.days;
-                const pRevenue = pUnits * salePrice;
-                const pProfit = pUnits * netProfitUnit;
-                projectionsHTML += `<div class="bg-gray-800/50 p-4 rounded-lg flex flex-col">
-                    <p class="font-bold text-lg text-blue-400">${p.period}</p>
-                    <p class="text-sm text-gray-400">${formatNumber(pUnits)} Unidades</p>
-                    <p class="text-sm text-gray-400">Ingresos: ${formatCurrency(pRevenue)}</p>
-                    <p class="text-sm font-semibold ${pProfit >= 0 ? 'positive' : 'negative'}">Ganancia: ${formatCurrency(pProfit)}</p>
-                    ${createPacingHTML(pUnits)}
-                </div>`;
-            });
-            projectionsHTML += `</div>`;
-            document.getElementById('salesProjections').innerHTML = projectionsHTML;
-
-            const createPlanItem = (label, value, highlight = false) => `<div class="flex justify-between items-baseline ${highlight ? 'bg-green-500/10 p-3 rounded-lg' : 'bg-gray-800/50 p-2 rounded-md'}"><p class="text-sm font-medium ${highlight ? 'text-green-300' : 'text-gray-400'}">${label}</p><p class="font-bold ${highlight ? 'text-xl text-green-300' : 'text-gray-200'}">${value}</p></div>`;
-            
-            let targetProjectionsHTML = `<h3 class="font-bold text-gray-300 mb-2">Plan Base para Ingresar ${formatCurrency(targetRevenue)}</h3>` + createPlanItem('Unidades a Vender (Mes)', `${formatNumber(unitsForTargetRevenue)}`, true) + createPlanItem('Ganancia Neta Estimada', `${formatCurrency(projectedNetProfit)}`, projectedNetProfit >= 0 ? 'positive' : 'negative');
-            
-            targetProjectionsHTML += `<div class="mt-8">`;
-            targetProjectionsHTML += `<h3 class="font-bold text-gray-300 mb-2">Proyecciones a Futuro</h3><p class="text-sm text-gray-500 mb-4">Basado en la meta de ingresos como un objetivo mensual.</p>`;
-            targetProjectionsHTML += `<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">`;
-            
-            const targetProjections = [
-                { period: '1 Mes', days: 30 },
-                { period: '3 Meses', days: 90 },
-                { period: '1 Año', days: 365 }
-            ];
-            
-            targetProjections.forEach(p => {
-                const pUnits = (unitsForTargetRevenue / 30) * p.days;
-                const pRevenue = (targetRevenue / 30) * p.days;
-                const pProfit = (projectedNetProfit / 30) * p.days;
-
-                targetProjectionsHTML += `<div class="bg-gray-800/50 p-4 rounded-lg flex flex-col">
-                    <p class="font-bold text-lg text-blue-400">${p.period}</p>
-                    <p class="text-sm text-gray-400">${formatNumber(pUnits)} Unidades</p>
-                    <p class="text-sm text-gray-400">Ingresos: ${formatCurrency(pRevenue)}</p>
-                    <p class="text-sm font-semibold ${pProfit >= 0 ? 'positive' : 'negative'}">Ganancia: ${formatCurrency(pProfit)}</p>
-                    ${createPacingHTML(pUnits)}
-                </div>`;
-            });
-            
-            targetProjectionsHTML += `</div></div>`;
-            document.getElementById('revenueProjectionPlan').innerHTML = targetProjectionsHTML;
-
-            let riskAnalysisHTML = `
-                <h3 class="font-bold text-gray-300 mb-2">Análisis de Sensibilidad</h3>
-                <div class="grid grid-cols-2 gap-4">
-                    <div class="input-group">
-                        <label for="priceVariationInput">Variación Precio (%)</label>
-                        <input type="number" id="priceVariationInput" value="${priceVariation}" placeholder="Ej: -5">
-                    </div>
-                    <div class="input-group">
-                        <label for="costVariationInput">Variación Costo (%)</label>
-                        <input type="number" id="costVariationInput" value="${costVariation}" placeholder="Ej: 10">
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-70 backdrop-blur-sm flex justify-center items-center z-[100] p-4">
+            <div className="bg-white dark:bg-gray-800/80 border border-gray-200/80 dark:border-gray-700/60 rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col">
+                <div className="p-6 border-b border-gray-200/80 dark:border-gray-700/60 flex justify-between items-center">
+                    <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200">Resumen Ejecutivo del Préstamo</h2>
+                    <button onClick={onClose} className="text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white">
+                        <X size={28} />
+                    </button>
+                </div>
+                <div className="p-6 overflow-y-auto">
+                    <div id="summary-content" className="bg-white dark:bg-gray-800 p-4">
+                         <FormattedSummary text={summaryText} />
                     </div>
                 </div>
-                <hr class="my-4 border-gray-700">
-                <h4 class="font-semibold text-gray-300 mb-2">Resultados de Simulación (para la meta de ${formatCurrency(targetRevenue)})</h4>` +
-                createPlanItem('Nuevas Unidades a Vender', `${formatNumber(unitsForSimulatedRevenue)}`, true) + 
-                createPlanItem('Nueva Ganancia Estimada', `${formatCurrency(simulatedProjectedProfit)}`, simulatedProjectedProfit >= 0 ? 'positive' : 'negative') + 
-                `<hr class="my-2 border-gray-700">` +
-                `<p class="font-semibold text-gray-400 text-sm mb-1">Desglose de Gastos (Simulación):</p>` +
-                createAnalysisItem('Costo de Productos', formatCurrency(simulatedProjectedProductCost), 'text-gray-200', true) +
-                createAnalysisItem('Costo de Courier', formatCurrency(simulatedProjectedCourierCost), 'text-gray-200', true) +
-                createAnalysisItem('Costo de Marketing', formatCurrency(simulatedProjectedMarketingCost), 'text-gray-200', true) +
-                createAnalysisItem('Costo Total', formatCurrency(simulatedProjectedTotalCost), 'text-amber-400');
+                 <div className="p-6 border-t border-gray-200/80 dark:border-gray-700/60 flex flex-wrap justify-end gap-4">
+                    <button 
+                        onClick={exportToPdf}
+                        className="bg-red-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-red-700 transition-colors inline-flex items-center"
+                    >
+                        <Download className="mr-2" size={18} />
+                        Exportar a PDF
+                    </button>
+                    <button 
+                        onClick={onSendEmail}
+                        className="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors inline-flex items-center"
+                    >
+                        <Mail className="mr-2" size={18} />
+                        Enviar por Correo
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
 
-            document.getElementById('riskAnalysis').innerHTML = riskAnalysisHTML;
+// --- Main App Component ---
+export default function App() {
+    const [loanData, setLoanData] = useState({ amount: '', interest: '', term: '', insurance: '' });
+    const [abonos, setAbonos] = useState([]);
+    const [isFixedAbono, setIsFixedAbono] = useState(false);
+    const [fixedAbonoAmount, setFixedAbonoAmount] = useState('');
+    const [showAdvanced, setShowAdvanced] = useState(false);
+    const [showSummary, setShowSummary] = useState(false);
+    const [theme, setTheme] = useState('dark');
+    const [isAnnualView, setIsAnnualView] = useState(false);
 
-            attachDynamicListeners();
-            lucide.createIcons();
+    useEffect(() => {
+        const jspdfScript = document.createElement('script');
+        jspdfScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+        jspdfScript.async = true;
+        document.body.appendChild(jspdfScript);
+
+        return () => {
+            document.body.removeChild(jspdfScript);
+        }
+    }, []);
+    
+    useEffect(() => {
+        const root = window.document.documentElement;
+        root.classList.remove(theme === 'dark' ? 'light' : 'dark');
+        root.classList.add(theme);
+    }, [theme]);
+
+    const handleCurrencyInput = useCallback((value, setter) => {
+        if (value === '') {
+            setter('');
+            return;
+        }
+        let cleanValue = value.replace(/[^0-9.]/g, '');
+        const parts = cleanValue.split('.');
+        if (parts.length > 2) {
+            cleanValue = parts[0] + '.' + parts.slice(1).join('');
         }
 
-        function attachDynamicListeners() {
-            document.getElementById('priceVariationInput')?.addEventListener('input', calculate);
-            document.getElementById('costVariationInput')?.addEventListener('input', calculate);
+        if (cleanValue === '.') {
+            setter('0.');
+            return;
         }
 
-        const allInputs = document.querySelectorAll('#input-section input');
-        allInputs.forEach(input => input.addEventListener('input', calculate));
+        const [integerPart, decimalPart] = cleanValue.split('.');
+        const formattedInteger = new Intl.NumberFormat('es-DO').format(integerPart || 0);
 
-        document.addEventListener('DOMContentLoaded', () => {
-            setupTabs();
-            calculate();
+        let displayValue = formattedInteger;
+        if (decimalPart !== undefined) {
+            displayValue += `.${decimalPart.substring(0, 2)}`;
+        }
+        
+        if (value.endsWith('.') && !displayValue.includes('.')) {
+            displayValue += '.';
+        }
 
-            const toggleButton = document.getElementById('toggleSalesProjections');
-            const salesSection = document.getElementById('salesProjections');
-            const buttonText = toggleButton.querySelector('span');
-            const buttonIcon = toggleButton.querySelector('i');
+        setter(displayValue);
+    }, []);
 
-            toggleButton.addEventListener('click', () => {
-                salesSection.classList.toggle('hidden');
-                if (salesSection.classList.contains('hidden')) {
-                    buttonText.textContent = 'Mostrar';
-                    buttonIcon.setAttribute('data-lucide', 'eye');
-                } else {
-                    buttonText.textContent = 'Ocultar';
-                    buttonIcon.setAttribute('data-lucide', 'eye-off');
-                }
-                lucide.createIcons();
-            });
+    const handleInputChange = useCallback((e) => {
+        const { id, value } = e.target;
+        if (id === 'amount' || id === 'insurance' || id === 'fixedAbonoAmount') {
+             const setter = id === 'amount' ? (v) => setLoanData(p => ({...p, amount: v})) :
+                           id === 'insurance' ? (v) => setLoanData(p => ({...p, insurance: v})) :
+                           setFixedAbonoAmount;
+            handleCurrencyInput(value, setter);
+        } else {
+            let sanitized = value.replace(/[^0-9.]/g, '');
+            if (sanitized.split('.').length > 2) {
+                sanitized = sanitized.replace(/\.(?=.*\.)/g, "");
+            }
+            setLoanData(prev => ({ ...prev, [id]: sanitized }));
+        }
+    }, [handleCurrencyInput]);
+
+    const handleAbonoChange = useCallback((index, value) => {
+        const newAbonos = [...abonos];
+        handleCurrencyInput(value, (newValue) => {
+            newAbonos[index] = newValue;
+            setAbonos(newAbonos);
         });
-    </script>
-</body>
-</html>
+    }, [abonos, handleCurrencyInput]);
+
+    const handleFixedAbonoToggle = useCallback(() => setIsFixedAbono(prev => !prev), []);
+    
+    const calculationResults = useMemo(() => {
+        const parseCurrency = (val) => parseFloat(String(val).replace(/,/g, ''));
+        
+        const amount = parseCurrency(loanData.amount);
+        const interest = parseFloat(loanData.interest);
+        const term = parseCurrency(loanData.term);
+        const insurance = parseCurrency(loanData.insurance);
+        const parsedFixedAbono = parseCurrency(fixedAbonoAmount);
+
+        if (isNaN(amount) || amount <= 0 || isNaN(interest) || interest < 0 || isNaN(term) || term <= 0 || isNaN(insurance) || insurance < 0) {
+            return null;
+        }
+
+        const monthlyInterest = interest / 100 / 12;
+        const totalPayments = term;
+        
+        let monthlyPayment;
+        if (monthlyInterest === 0) {
+            monthlyPayment = amount / totalPayments;
+        } else {
+            monthlyPayment = (amount * monthlyInterest) / (1 - Math.pow(1 + monthlyInterest, -totalPayments));
+        }
+
+        if (isNaN(monthlyPayment) || !isFinite(monthlyPayment)) {
+            return null;
+        }
+        
+        const calculatePayoffDate = (start, months) => {
+            if (isNaN(months)) return null;
+            const date = new Date(start);
+            date.setMonth(date.getMonth() + months);
+            return date;
+        };
+
+        // --- Original Plan Calculation ---
+        let originalSchedule = [];
+        let tempBalance = amount;
+        for(let i=0; i < totalPayments; i++) {
+            const interestP = tempBalance * monthlyInterest;
+            const principalP = monthlyPayment - interestP;
+            tempBalance -= principalP;
+            originalSchedule.push({ principal: principalP, interest: interestP });
+        }
+        
+        const totalOriginalInsurance = insurance * totalPayments;
+        const totalOriginalInterest = originalSchedule.reduce((acc, curr) => acc + curr.interest, 0);
+        const original = {
+            monthlyPayment,
+            totalInterest: totalOriginalInterest,
+            totalInsurance: totalOriginalInsurance,
+            totalPaid: amount + totalOriginalInterest + totalOriginalInsurance,
+            termInMonths: totalPayments,
+            inflectionPoint: originalSchedule.findIndex(p => p.principal > p.interest) + 1,
+            payoffDate: calculatePayoffDate(new Date(), totalPayments),
+        };
+
+        // --- Accelerated Plan Calculation ---
+        const currentAbonos = isFixedAbono ? new Array(totalPayments).fill(isNaN(parsedFixedAbono) ? 0 : parsedFixedAbono) : abonos.map(a => parseCurrency(a) || 0);
+        let balance = amount;
+        let schedule = [];
+        let totalAbonosPaid = 0;
+        let monthsPaid = 0;
+
+        for (let i = 0; i < totalPayments && balance > 0.01; i++) {
+            monthsPaid++;
+            const startBalance = balance;
+            const interestPayment = balance * monthlyInterest;
+            const extraPayment = currentAbonos[i] || 0;
+            let principalPayment = monthlyPayment - interestPayment;
+            
+            if (balance <= principalPayment + extraPayment) {
+                principalPayment = balance - extraPayment > 0 ? balance - extraPayment : 0;
+                balance = 0;
+            } else {
+                 balance -= (principalPayment + extraPayment);
+            }
+            totalAbonosPaid += extraPayment;
+            
+            schedule.push({
+                month: i + 1, payment: monthlyPayment, principal: principalPayment,
+                interest: interestPayment, extra: extraPayment, balance: balance > 0 ? balance : 0,
+                startBalance: startBalance
+            });
+        }
+        
+        const totalAbonosInterest = schedule.reduce((acc, p) => acc + p.interest, 0);
+        const totalAbonosInsurance = insurance * monthsPaid;
+        const withAbonos = {
+            schedule,
+            totalInterest: totalAbonosInterest,
+            totalInsurance: totalAbonosInsurance,
+            totalPaid: amount + totalAbonosInterest + totalAbonosInsurance,
+            termInMonths: monthsPaid,
+            totalAbonosPaid,
+            inflectionPoint: schedule.findIndex(p => p.principal + (p.extra || 0) > p.interest) + 1 || monthsPaid,
+            payoffDate: calculatePayoffDate(new Date(), monthsPaid),
+        };
+        
+        // --- KPI Calculations ---
+        const interestSaved = original.totalInterest - withAbonos.totalInterest;
+        const insuranceSaved = original.totalInsurance - withAbonos.totalInsurance;
+        const kpis = {
+            totalSavings: original.totalPaid - withAbonos.totalPaid,
+            monthsSaved: original.termInMonths - withAbonos.termInMonths,
+            abonoPower: withAbonos.totalAbonosPaid > 0 ? interestSaved / withAbonos.totalAbonosPaid : 0,
+            amortizationRate: withAbonos.termInMonths > 0 ? original.termInMonths / withAbonos.termInMonths : 0,
+            originalInterestPercent: original.totalPaid > 0 ? (original.totalInterest / original.totalPaid) : 0,
+            withAbonosInterestPercent: withAbonos.totalPaid > 0 ? (withAbonos.totalInterest / withAbonos.totalPaid) : 0,
+            totalCostOfCreditOriginal: (original.totalPaid / amount) - 1,
+            totalCostOfCreditAbonos: (withAbonos.totalPaid / amount) - 1,
+            interestToPrincipalRatioOriginal: original.totalInterest / amount,
+            interestToPrincipalRatioAbonos: withAbonos.totalInterest / amount,
+            insuranceToPrincipalRatioOriginal: original.totalInsurance / amount,
+            insuranceToPrincipalRatioAbonos: withAbonos.totalInsurance / amount,
+            firstMonthInterestPercent: originalSchedule.length > 0 ? (originalSchedule[0].interest / (original.monthlyPayment + insurance)) : 0,
+            firstMonthPrincipalPercent: originalSchedule.length > 0 ? (originalSchedule[0].principal / (original.monthlyPayment + insurance)) : 0,
+            insuranceSaved: insuranceSaved,
+            interestSaved: interestSaved,
+            termReductionPercentage: (original.termInMonths - withAbonos.termInMonths) / original.termInMonths,
+            averagePrincipalPaidPerMonth: withAbonos.termInMonths > 0 ? amount / withAbonos.termInMonths : 0,
+            dailyInterestFirstMonth: originalSchedule.length > 0 ? originalSchedule[0].interest / 30.44 : 0,
+            principalPaidAfterOneYear: withAbonos.schedule.slice(0, 12).reduce((acc, row) => acc + row.principal + row.extra, 0),
+            abonoToPaymentRatio: (isFixedAbono && parsedFixedAbono > 0 && (original.monthlyPayment + insurance + parsedFixedAbono) > 0) ? parsedFixedAbono / (original.monthlyPayment + insurance + parsedFixedAbono) : 0,
+        };
+
+        return { original, withAbonos, inputs: { amount, interest, term, insurance }, kpis };
+    }, [loanData, abonos, isFixedAbono, fixedAbonoAmount]);
+
+    const executiveSummaryText = useMemo(() => {
+        if (!calculationResults) return "";
+        const { original, withAbonos, inputs, kpis } = calculationResults;
+        
+        const termInYears = Math.floor(inputs.term / 12);
+        const remainingMonths = inputs.term % 12;
+        const termString = `${inputs.term} meses ${termInYears > 0 ? `(${termInYears} año(s) y ${remainingMonths} mes(es))` : ''}`.trim();
+
+        return `**ANÁLISIS FINANCIERO DE PRÉSTAMO**
+**FECHA DE EMISIÓN:** ${formatDate(new Date())}
+
+Este informe detalla el análisis de un préstamo de ${formatCurrency(inputs.amount)} a un plazo de ${termString} con una tasa de interés anual del ${inputs.interest}%. Se compara el plan de pago estándar con una estrategia de pagos acelerados para evaluar los beneficios financieros.
+
+**ESCENARIO 1: PLAN DE PAGO ORIGINAL**
+Bajo el esquema de pago estándar, sin realizar abonos extraordinarios, el préstamo se liquidaría el ${formatDate(original.payoffDate)}. El costo total ascendería a ${formatCurrency(original.totalPaid)}, desglosado en ${formatCurrency(inputs.amount)} de capital, ${formatCurrency(original.totalInterest)} en intereses y ${formatCurrency(original.totalInsurance)} en costos de seguro. La cuota mensual (capital + interés + seguro) sería de ${formatCurrency(original.monthlyPayment + inputs.insurance)}.
+
+**ESCENARIO 2: PLAN DE PAGO ACELERADO**
+Al implementar una estrategia de abonos a capital, que suma un total de ${formatCurrency(withAbonos.totalAbonosPaid)}, el panorama financiero mejora sustancialmente. El costo total del préstamo se reduce a ${formatCurrency(withAbonos.totalPaid)}, y la fecha de liquidación se adelanta al ${formatDate(withAbonos.payoffDate)}.
+
+**ANÁLISIS DE AHORRO Y EFICIENCIA**
+La estrategia de abonos genera un AHORRO TOTAL de ${formatCurrency(kpis.totalSavings)}, una cifra que representa la suma del interés y los costos de seguro que se dejan de pagar. Esto se logra al reducir el plazo del préstamo en ${kpis.monthsSaved} meses.
+
+**INDICADORES CLAVE DE RENDIMIENTO (KPIs)**
+• **Poder del Abono:** Cada ${formatCurrency(1)} abonado genera un ahorro de ${formatCurrency(kpis.abonoPower)} en intereses.
+• **Tasa de Amortización:** El préstamo se liquida ${formatRatio(kpis.amortizationRate)} veces más rápido que el plan original.
+• **Punto de Inflexión:** El mes en que los pagos a capital superan a los intereses se adelanta del mes ${original.inflectionPoint} al mes ${withAbonos.inflectionPoint}.
+
+**ESTRATEGIAS Y RECOMENDACIONES**
+• **Disciplina en Abonos:** Mantener la consistencia en los abonos fijos es clave para maximizar el ahorro a largo plazo.
+• **Abonos Extraordinarios:** Considere destinar ingresos no recurrentes (bonificaciones, etc.) a abonos extraordinarios para acelerar aún más el pago.
+• **Revisión de Tasa:** Evalúe periódicamente la posibilidad de renegociar la tasa de interés con su entidad financiera para optimizar aún más las condiciones del préstamo.
+
+**CONCLUSIÓN**
+La estrategia de pagos acelerados demuestra ser altamente efectiva, generando un ahorro sustancial y reduciendo el tiempo de endeudamiento.
+        `;
+    }, [calculationResults]);
+    
+    const handleSendEmail = () => {
+        const subject = "Resumen Ejecutivo de Análisis de Préstamo";
+        const plainTextBody = executiveSummaryText.replace(/\*\*/g, ''); 
+        const body = encodeURIComponent(plainTextBody);
+        window.location.href = `mailto:?subject=${subject}&body=${body}`;
+    };
+
+    const chartDataOriginal = useMemo(() => {
+        if (!calculationResults) return [];
+        const { inputs, original } = calculationResults;
+        return [
+            { name: 'Capital', value: inputs.amount, color: '#34d399' },
+            { name: 'Interés', value: original.totalInterest, color: '#f87171' },
+            { name: 'Seguro', value: original.totalInsurance, color: '#9ca3af' }
+        ];
+    }, [calculationResults]);
+
+    const chartDataWithAbonos = useMemo(() => {
+        if (!calculationResults) return [];
+        const { inputs, withAbonos } = calculationResults;
+        return [
+            { name: 'Capital', value: inputs.amount, color: '#34d399' },
+            { name: 'Interés', value: withAbonos.totalInterest, color: '#f87171' },
+            { name: 'Seguro', value: withAbonos.totalInsurance, color: '#9ca3af' }
+        ];
+    }, [calculationResults]);
+
+
+    return (
+        <>
+            <div className={`min-h-screen p-4 sm:p-6 lg:p-8 transition-colors duration-500 ${theme === 'dark' ? 'bg-gradient-to-br from-gray-900 via-gray-800 to-slate-900 text-gray-300' : 'bg-slate-50 text-gray-800'}`}>
+                <div className="max-w-7xl mx-auto pb-28">
+                    <div className="absolute top-4 right-4 z-40">
+                        <button onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')} className="p-2 rounded-full bg-gray-500/20 hover:bg-gray-500/40 text-white transition">
+                            {theme === 'light' ? <Moon size={20} className="text-gray-800"/> : <Sun size={20} className="text-amber-400"/>}
+                        </button>
+                    </div>
+
+                    <AnimatedSection>
+                        <header className="text-center mb-12">
+                            <h1 className={`text-4xl md:text-5xl lg:text-6xl font-black tracking-tight ${theme === 'dark' ? 'text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-amber-200' : 'text-gray-800'}`}>Domina Tu Deuda: Simulador Financiero Pro</h1>
+                            <p className="text-gray-500 dark:text-gray-400 mt-4 text-lg max-w-3xl mx-auto">Visualiza tu camino hacia la libertad financiera. Estrategias de abono, análisis de costos y amortización detallada en un solo lugar.</p>
+                        </header>
+                    </AnimatedSection>
+                    
+                    <AnimatedSection delay={150}>
+                        <div className="bg-white/60 dark:bg-gray-800/30 backdrop-blur-xl p-6 rounded-2xl shadow-md border border-gray-200/80 dark:border-gray-700/60 mb-8">
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                                <InputField label="Monto del Préstamo (RD$)" id="amount" value={loanData.amount} onChange={handleInputChange} placeholder="Ej: 500,000"/>
+                                <InputField label="Tasa de Interés Anual (%)" id="interest" value={loanData.interest} onChange={handleInputChange} placeholder="Ej: 18"/>
+                                <InputField label="Plazo (Meses)" id="term" value={loanData.term} onChange={handleInputChange} placeholder="Ej: 60"/>
+                                <InputField label="Seguro de Vida Mensual (RD$)" id="insurance" value={loanData.insurance} onChange={handleInputChange} placeholder="Ej: 800"/>
+                            </div>
+                             <div className="mt-6 pt-6 border-t border-gray-200/80 dark:border-gray-700/60 flex flex-col sm:flex-row items-center justify-between gap-4">
+                                <ToggleSwitch label="Aplicar abono fijo mensual" checked={isFixedAbono} onChange={handleFixedAbonoToggle} />
+                                {isFixedAbono && (
+                                     <div className="w-full sm:w-auto">
+                                        <InputField label="Monto del Abono Fijo" id="fixedAbonoAmount" value={fixedAbonoAmount} onChange={handleInputChange} placeholder="Ej: 2,500"/>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </AnimatedSection>
+
+                    {!calculationResults ? (
+                        <AnimatedSection delay={300}>
+                            <div className="text-center bg-gray-800/20 dark:bg-yellow-900/20 border border-gray-500/20 dark:border-yellow-500/30 text-gray-500 dark:text-yellow-300 p-10 rounded-2xl shadow-lg">
+                                <h2 className="text-2xl font-bold">Calculadora Lista</h2>
+                                <p className="mt-2">Por favor, ingrese los datos del préstamo para comenzar el análisis.</p>
+                            </div>
+                        </AnimatedSection>
+                    ) : (
+                        <>
+                            <AnimatedSection delay={300}>
+                                <h2 className="text-3xl font-extrabold text-gray-800 dark:text-gray-200 mb-6 text-center tracking-tight">Resultados Clave del Ahorro</h2>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8">
+                                    <MetricCard title="Ahorro Total" value={formatCurrency(calculationResults.kpis.totalSavings)} icon={<PiggyBank size={24} />} colorClass="text-green-500 dark:text-green-400" tooltipText="Suma total de intereses y seguros que dejas de pagar gracias a los abonos."/>
+                                    <MetricCard title="Tiempo Ahorrado" value={`${calculationResults.kpis.monthsSaved} meses`} icon={<Clock size={24} />} colorClass="text-purple-500 dark:text-purple-400" tooltipText="Cantidad de meses que reduces del plazo original del préstamo."/>
+                                    <MetricCard title="Costo Total con Abonos" value={formatCurrency(calculationResults.withAbonos.totalPaid)} icon={<ShieldCheck size={24} />} colorClass="text-slate-600 dark:text-slate-400" subValue={`Orig: ${formatCurrency(calculationResults.original.totalPaid)}`} tooltipText="Suma total de capital, intereses y seguros pagados al final del préstamo."/>
+                                    <MetricCard title="Nueva Fecha de Saldo" value={formatDate(calculationResults.withAbonos.payoffDate)} icon={<CalendarCheck size={24} />} colorClass="text-blue-500 dark:text-blue-400" subValue={`Orig: ${formatDate(calculationResults.original.payoffDate)}`} tooltipText="Fecha estimada en la que terminarás de pagar el préstamo."/>
+                                </div>
+                            </AnimatedSection>
+
+                            <AnimatedSection delay={450}>
+                                 <div className="bg-white/60 dark:bg-gray-800/30 backdrop-blur-xl p-6 rounded-2xl shadow-md border border-gray-200/80 dark:border-gray-700/60 mb-8">
+                                    <h2 className="text-3xl font-extrabold text-gray-800 dark:text-gray-200 mb-6 text-center tracking-tight">Análisis de Costos Totales</h2>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                       <div>
+                                           <h3 className="text-xl font-semibold text-center mb-4 text-gray-700 dark:text-gray-400">Plan Original (Sin Abonos)</h3>
+                                           <div className="space-y-4">
+                                               <MetricCard title="Total Capital Pagado" value={formatCurrency(calculationResults.inputs.amount)} icon={<Building size={24} />} colorClass="text-green-500 dark:text-green-400" tooltipText="Monto original solicitado en el préstamo."/>
+                                               <MetricCard title="Total Interés Pagado" value={formatCurrency(calculationResults.original.totalInterest)} icon={<TrendingDown size={24} />} colorClass="text-rose-500 dark:text-rose-400" tooltipText="Suma de todos los pagos de interés durante la vida del préstamo."/>
+                                               <MetricCard title="Total Seguro Pagado" value={formatCurrency(calculationResults.original.totalInsurance)} icon={<Shield size={24} />} colorClass="text-sky-500 dark:text-sky-400" tooltipText="Suma de todas las cuotas de seguro durante la vida del préstamo."/>
+                                               <MetricCard title="Fecha de Liquidación" value={formatDate(calculationResults.original.payoffDate)} icon={<CalendarX size={24} />} colorClass="text-gray-500 dark:text-gray-400" tooltipText="Fecha final de pago si no se realizan abonos."/>
+                                           </div>
+                                       </div>
+                                       <div>
+                                           <h3 className="text-xl font-semibold text-center mb-4 text-gray-700 dark:text-gray-400">Plan Acelerado (Con Abonos)</h3>
+                                           <div className="space-y-4">
+                                               <MetricCard title="Total Capital Pagado" value={formatCurrency(calculationResults.inputs.amount)} icon={<Building size={24} />} colorClass="text-green-500 dark:text-green-400" tooltipText="Monto original solicitado en el préstamo."/>
+                                               <MetricCard title="Total Interés Pagado" value={formatCurrency(calculationResults.withAbonos.totalInterest)} icon={<TrendingDown size={24} />} colorClass="text-rose-500 dark:text-rose-400" tooltipText="Suma de todos los pagos de interés con abonos."/>
+                                               <MetricCard title="Total Seguro Pagado" value={formatCurrency(calculationResults.withAbonos.totalInsurance)} icon={<Shield size={24} />} colorClass="text-sky-500 dark:text-sky-400" tooltipText="Suma de todas las cuotas de seguro con el plan acelerado."/>
+                                               <MetricCard title="Fecha de Liquidación" value={formatDate(calculationResults.withAbonos.payoffDate)} icon={<CalendarCheck size={24} />} colorClass="text-blue-500 dark:text-blue-400" tooltipText="Fecha final de pago con la estrategia de abonos."/>
+                                           </div>
+                                       </div>
+                                    </div>
+                                </div>
+                            </AnimatedSection>
+                            
+                            <AnimatedSection delay={600}>
+                                <div className="my-8 flex justify-center">
+                                    <ToggleSwitch label="Ver Análisis Avanzado y Gráficos" checked={showAdvanced} onChange={() => setShowAdvanced(!showAdvanced)} />
+                                </div>
+                            </AnimatedSection>
+
+                            {showAdvanced && (
+                                <AnimatedSection delay={0}>
+                                    <div className="mb-8 space-y-8">
+                                        <div className="bg-white/60 dark:bg-gray-800/30 backdrop-blur-xl p-6 rounded-2xl shadow-md border border-gray-200/80 dark:border-gray-700/60">
+                                             <h2 className="text-3xl font-extrabold text-gray-800 dark:text-gray-200 mb-6 text-center tracking-tight">Análisis Gráfico de Composición</h2>
+                                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                                                <PieChart data={chartDataOriginal} title="Composición Sin Abonos" />
+                                                <PieChart data={chartDataWithAbonos} title="Composición Con Abonos" />
+                                            </div>
+                                        </div>
+                                        <div className="bg-white/60 dark:bg-gray-800/30 backdrop-blur-xl p-6 rounded-2xl shadow-md border border-gray-200/80 dark:border-gray-700/60">
+                                            <h2 className="text-3xl font-extrabold text-gray-800 dark:text-gray-200 mb-6 text-center tracking-tight">Métricas de Rendimiento y KPIs Expandidos</h2>
+                                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
+                                                {/* Original KPIs */}
+                                                <MetricCard title="Poder de tu Abono" value={`${formatCurrency(calculationResults.kpis.abonoPower)}`} icon={<Sparkles size={24} />} colorClass="text-amber-500 dark:text-amber-400" tooltipText="Por cada RD$1 que abonas, te ahorras esta cantidad en intereses." subValue="x RD$1"/>
+                                                <MetricCard title="Punto de Inflexión" value={`Mes ${calculationResults.withAbonos.inflectionPoint}`} icon={<Zap size={24} />} colorClass="text-rose-500 dark:text-rose-400" tooltipText="Mes en que el pago a capital supera al interés." subValue={`Orig: ${calculationResults.original.inflectionPoint}`}/>
+                                                <MetricCard title="Tasa de Amortización" value={`${formatRatio(calculationResults.kpis.amortizationRate)}x`} icon={<FastForward size={24} />} colorClass="text-lime-500 dark:text-lime-400" tooltipText="Qué tan rápido pagas el préstamo comparado con el plan original." subValue="Más rápido"/>
+                                                <MetricCard title="Interés % del Pago Total" value={`${formatPercent(calculationResults.kpis.withAbonosInterestPercent)}`} icon={<Percent size={24} />} colorClass="text-fuchsia-500 dark:text-fuchsia-400" tooltipText="Porcentaje de tus pagos que es solo interés." subValue={`Orig: ${formatPercent(calculationResults.kpis.originalInterestPercent)}`}/>
+                                                
+                                                {/* Expanded KPIs */}
+                                                <MetricCard title="Ahorro en Intereses" value={formatCurrency(calculationResults.kpis.interestSaved)} icon={<TrendingDown size={24} />} colorClass="text-red-500 dark:text-red-400" tooltipText="Monto total de interés que dejas de pagar."/>
+                                                <MetricCard title="Ahorro en Seguros" value={formatCurrency(calculationResults.kpis.insuranceSaved)} icon={<Shield size={24} />} colorClass="text-sky-500 dark:text-sky-400" tooltipText="Monto total de seguro que dejas de pagar al acortar el plazo."/>
+                                                <MetricCard title="Reducción del Plazo" value={formatPercent(calculationResults.kpis.termReductionPercentage)} icon={<Wind size={24} />} colorClass="text-teal-500 dark:text-teal-400" tooltipText="Porcentaje de reducción del plazo total del préstamo."/>
+                                                <MetricCard title="Costo Total del Crédito" value={formatPercent(calculationResults.kpis.totalCostOfCreditAbonos)} icon={<Scale size={24} />} colorClass="text-orange-500 dark:text-orange-400" tooltipText="Costo total (interés+seguro) como porcentaje del monto del préstamo." subValue={`Orig: ${formatPercent(calculationResults.kpis.totalCostOfCreditOriginal)}`}/>
+                                                <MetricCard title="Ratio Interés/Capital" value={formatRatio(calculationResults.kpis.interestToPrincipalRatioAbonos)} icon={<BarChart size={24} />} colorClass="text-indigo-500 dark:text-indigo-400" tooltipText="Cuánto pagas en interés por cada peso de capital." subValue={`Orig: ${formatRatio(calculationResults.kpis.interestToPrincipalRatioOriginal)}`}/>
+                                                <MetricCard title="Ratio Seguro/Capital" value={formatRatio(calculationResults.kpis.insuranceToPrincipalRatioAbonos)} icon={<BookOpen size={24} />} colorClass="text-cyan-500 dark:text-cyan-400" tooltipText="Cuánto pagas en seguro por cada peso de capital." subValue={`Orig: ${formatRatio(calculationResults.kpis.insuranceToPrincipalRatioOriginal)}`}/>
+                                                <MetricCard title="Cuota/Interés (1er Mes)" value={formatPercent(calculationResults.kpis.firstMonthInterestPercent)} icon={<Target size={24} />} colorClass="text-rose-600 dark:text-rose-500" tooltipText="Porcentaje de tu primera cuota que se destina a pagar solo intereses."/>
+                                                <MetricCard title="Cuota/Capital (1er Mes)" value={formatPercent(calculationResults.kpis.firstMonthPrincipalPercent)} icon={<Gauge size={24} />} colorClass="text-green-600 dark:text-green-500" tooltipText="Porcentaje de tu primera cuota que reduce tu deuda de capital."/>
+                                                <MetricCard title="Velocidad de Pago" value={`${formatCurrency(calculationResults.kpis.averagePrincipalPaidPerMonth)}/mes`} icon={<TrendingUp size={24} />} colorClass="text-emerald-500 dark:text-emerald-400" tooltipText="Promedio de capital que amortizas cada mes con el plan acelerado."/>
+                                                <MetricCard title="Interés Diario (1er Mes)" value={formatCurrency(calculationResults.kpis.dailyInterestFirstMonth)} icon={<Calculator size={24} />} colorClass="text-yellow-600 dark:text-yellow-500" tooltipText="Costo diario promedio del interés durante el primer mes del préstamo."/>
+                                                <MetricCard title="Capital Pagado (Año 1)" value={formatCurrency(calculationResults.kpis.principalPaidAfterOneYear)} icon={<Banknote size={24} />} colorClass="text-lime-600 dark:text-lime-500" tooltipText="Suma total de capital (regular + abonos) pagada durante los primeros 12 meses."/>
+                                                <MetricCard title="Abono % de Cuota Total" value={formatPercent(calculationResults.kpis.abonoToPaymentRatio)} icon={<PieChartIcon size={24} />} colorClass="text-violet-500 dark:text-violet-400" tooltipText="Qué porcentaje representa tu abono fijo sobre el desembolso mensual total (cuota+seguro+abono)." subValue="Abono Fijo"/>
+                                             </div>
+                                        </div>
+                                    </div>
+                                </AnimatedSection>
+                            )}
+                            
+                            <AnimatedSection delay={showAdvanced ? 200 : 750}>
+                                <div className="bg-white/60 dark:bg-gray-800/30 backdrop-blur-xl p-6 rounded-2xl shadow-md border border-gray-200/80 dark:border-gray-700/60 mt-8">
+                                    <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200 mb-2 text-center">Reporte Ejecutivo y Acciones</h2>
+                                    <p className="text-gray-500 dark:text-gray-400 text-center mb-6">Genere un resumen detallado de su análisis para guardarlo o compartirlo.</p>
+                                    <div className="flex justify-center">
+                                        <button
+                                            onClick={() => setShowSummary(true)}
+                                            className="bg-amber-500 text-gray-900 font-bold py-3 px-6 rounded-lg hover:bg-amber-400 transition-colors inline-flex items-center shadow-lg hover:shadow-xl"
+                                        >
+                                            <FileText className="mr-2" size={20} />
+                                            Ver Resumen Ejecutivo
+                                        </button>
+                                    </div>
+                                </div>
+                            </AnimatedSection>
+                            
+                            <AnimatedSection delay={showAdvanced ? 250 : 800}>
+                                 <AmortizationTable 
+                                    schedule={calculationResults.withAbonos.schedule} 
+                                    isFixedAbono={isFixedAbono} 
+                                    fixedAbonoAmount={fixedAbonoAmount} 
+                                    onAbonoChange={handleAbonoChange}
+                                    abonos={abonos}
+                                    insuranceAmount={calculationResults.inputs.insurance}
+                                    amount={calculationResults.inputs.amount}
+                                    isAnnualView={isAnnualView}
+                                    setIsAnnualView={setIsAnnualView}
+                                />
+                            </AnimatedSection>
+                        </>
+                    )}
+                </div>
+            </div>
+
+            <SummaryModal
+                isOpen={showSummary}
+                onClose={() => setShowSummary(false)}
+                summaryText={executiveSummaryText}
+                onSendEmail={handleSendEmail}
+                calculationResults={calculationResults}
+            />
+        </>
+    );
+}
